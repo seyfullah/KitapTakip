@@ -1,0 +1,19 @@
+*{box-sizing:border-box}body{font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif;margin:0;background:#f4f6fa;color:#222}
+nav{background:#1f3a5f;padding:8px 14px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+nav b{color:#fff;margin-right:14px}nav a{color:#cfe0f7;text-decoration:none;padding:6px 10px;border-radius:5px}
+nav a:hover,nav a.on{background:#2f5c93;color:#fff}nav a.out{margin-left:auto}
+main{padding:18px;max-width:1400px;margin:auto}h1{margin:0 0 14px;font-size:22px}h2{font-size:17px;margin:22px 0 8px}
+table{border-collapse:collapse;width:100%;background:#fff;margin-bottom:14px}th,td{border:1px solid #dde3ee;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#e8eef8;white-space:nowrap}td.r{text-align:right;white-space:nowrap}tr.tot td{font-weight:700;background:#f0f4fb}tr.warn td{background:#fff1f0}
+.muted{color:#888}.flash{background:#e6f6ea;border:1px solid #9fd5ac;padding:8px 12px;margin-bottom:12px;border-radius:6px}.flash.err{background:#fdeaea;border-color:#e3a0a0}
+form.f,.card{background:#fff;border:1px solid #dde3ee;border-radius:8px;padding:12px;margin-bottom:16px}
+form.f{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}label{display:flex;flex-direction:column;font-size:12px;color:#555;gap:3px}
+input,select,textarea{padding:6px 8px;border:1px solid #b8c2d4;border-radius:5px;font:inherit;min-width:120px}
+button,.btn{background:#2f5c93;color:#fff;border:0;border-radius:5px;padding:7px 14px;cursor:pointer;text-decoration:none;display:inline-block;font:inherit}
+button.danger{background:#b3382c}.btn.alt{background:#5b6b82}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid #dde3ee;border-radius:8px;padding:14px}.kpi small{color:#667}.kpi div{font-size:21px;font-weight:700;margin-top:4px}.kpi.bad div{color:#b3382c}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}.chart{background:#fff;border:1px solid #dde3ee;border-radius:8px;padding:12px}
+body.login{display:flex;justify-content:center;align-items:center;height:100vh}.login .card{width:320px;display:flex;flex-direction:column;gap:10px}
+.lines input,.lines select{min-width:0;width:100%}.crit{color:#b3382c;font-weight:700}
+@media print{.no-print,nav{display:none!important}body{background:#fff}main{padding:0}table{font-size:12px}}
