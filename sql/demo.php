@@ -1,8 +1,13 @@
 <?php
 // Demo veri: php install.php admin admin123 --demo
+if ((int) val('SELECT COUNT(*) FROM customers') > 0) {
+    echo "Demo verisi zaten var; mevcut kayıtlar korunuyor.\n";
+    return;
+}
 $today = date('Y-m-d');
 $bk = [['MAT5', 'Matematik 5', 'Başarı Yayınları', '5. Sınıf', 90, 150, 50, 100], ['TRK6', 'Türkçe 6', 'Başarı Yayınları', '6. Sınıf', 95, 170, 40, 80], ['FEN7', 'Fen Bilimleri 7', 'Yıldız Yayınları', '7. Sınıf', 100, 180, 40, 60]];
-foreach ($bk as $b) q('INSERT IGNORE INTO books (kod, ad, yayinevi, sinif, alis_fiyati, satis_fiyati, koli_adedi, kritik_stok) VALUES (?,?,?,?,?,?,?,?)', $b);
+$ignore = cfg('app_storage') === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+foreach ($bk as $b) q("$ignore INTO books (kod, ad, yayinevi, sinif, alis_fiyati, satis_fiyati, koli_adedi, kritik_stok) VALUES (?,?,?,?,?,?,?,?)", $b);
 $cs = [['Okul', 'Özel Başarı Okulu', 'Ankara', 'Çankaya'], ['Okul', 'Atatürk İlkokulu', 'Ankara', 'Keçiören'], ['Kırtasiye', 'Güneş Kırtasiye', 'İzmir', 'Karşıyaka']];
 foreach ($cs as $c) q('INSERT INTO customers (tip, ad, il, ilce, telefon) VALUES (?,?,?,?,?)', [...$c, '0555 000 00 00']);
 foreach (rows('SELECT id FROM books') as $b) q('INSERT INTO stock_in (book_id, tarih, adet, aciklama) VALUES (?,?,?,?)', [$b['id'], date('Y-m-d', strtotime('-90 days')), 1000, 'Açılış']);

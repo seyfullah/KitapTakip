@@ -16,10 +16,32 @@ PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve car
 - Panelde "en çok satış yapılan" ve "en yüksek alacaklı" müşteri listeleri
 - Her Pazartesi 08.00'de alacaklı müşterilere e-posta ve SMS hatırlatması
 
+## Hızlı deneme (MySQL ve e-posta olmadan)
+
+Yerel deneme modu verileri tek bir dosya tabanlı SQLite veritabanında tutar; MySQL sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır.
+
+1. Örnek veriler ve `admin / admin123` hesabıyla yerel dosyayı hazırlayın:
+
+   ```sh
+   php install.php --sqlite --demo
+   ```
+
+   Varsayılan dosya proje klasörünün dışında `../kitaptakip-data/kitaptakip.sqlite` konumuna yazılır. Yerini değiştirmek için `APP_DATA_FILE=/tam/yol/kitaptakip.sqlite` ayarlayın (kurulumda ve sunucuyu başlatırken aynı ayarı kullanın). Dosya izinleri nedeniyle kurulum ve web sunucusu aynı kullanıcıyla çalışmalıdır.
+
+2. Yerel web sunucusunu başlatın:
+
+   ```sh
+   APP_STORAGE=sqlite php -S 127.0.0.1:8000
+   ```
+
+3. `http://127.0.0.1:8000` adresinden `admin / admin123` ile giriş yapın. Kitap, stok girişi/teslimatı, müşteri, satış ve tahsilat kayıtları dosyada saklanır ve sunucu yeniden başlatıldığında korunur. Demo verisini yeniden oluşturmak veya sıfırlamak için SQLite dosyasını silip `php install.php --sqlite --demo` komutunu tekrar çalıştırın. Bu varsayılan hesabı yalnızca yerel testte kullanın; sunucuyu `127.0.0.1` adresine bağlayın ve deneme modunu internete açmayın.
+
+Bu modda gerçek e-posta/SMS gönderimi özellikle devre dışıdır; `cron_notify.php` gönderim yapmadan açıklayıcı hata verir. Google Sheets aktarımı da servis hesabı ayarlanmadığı sürece kapalıdır.
+
 ## Gereksinimler
 
-- PHP 8.1 veya üzeri; `pdo_mysql`, `mbstring`, `zip`, `curl` ve OpenSSL eklentileri
-- MySQL 8+ veya MariaDB 10.4+
+- PHP 8.1 veya üzeri; MySQL modu için `pdo_mysql`, yerel dosya modu için `pdo_sqlite`; dışa aktarım ve entegrasyonlara göre `mbstring`, `zip`, `curl` ve OpenSSL eklentileri
+- Üretim MySQL modu için MySQL 8+ veya MariaDB 10.4+ (yerel deneme modunda MySQL gerekmez)
 - Google Sheets entegrasyonu için Google Cloud servis hesabı ve Sheets API erişimi (isteğe bağlı)
 
 ## Kurulum

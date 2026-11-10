@@ -8,6 +8,9 @@ require __DIR__ . '/lib.php';
 date_default_timezone_set('Europe/Istanbul');
 
 try {
+    if (cfg('app_storage') === 'sqlite') {
+        throw new RuntimeException('Yerel dosya modunda gerçek e-posta/SMS gönderimi devre dışıdır.');
+    }
     $result = send_weekly_reminders();
     echo sprintf(
         "%s: %d müşteri, %d gönderildi, %d atlandı, %d başarısız\n",

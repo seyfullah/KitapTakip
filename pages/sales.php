@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $bookIds = array_keys($need);
         sort($bookIds, SORT_NUMERIC);
-        foreach ($bookIds as $bookId) q('SELECT id FROM books WHERE id = ? FOR UPDATE', [$bookId]);
+        foreach ($bookIds as $bookId) q('SELECT id FROM books WHERE id = ?' . (cfg('app_storage') === 'sqlite' ? '' : ' FOR UPDATE'), [$bookId]);
         foreach ($need as $bid => $n) {
             $available = book_stock((int) $bid);
             if ($n > $available) throw new DomainException(val('SELECT ad FROM books WHERE id = ?', [$bid]) . " için stok yetersiz (stok: $available).");

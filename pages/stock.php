@@ -16,7 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo = db();
             $pdo->beginTransaction();
             try {
-                if (!row('SELECT id FROM books WHERE id = ? FOR UPDATE', [$bid])) throw new DomainException('Kitap bulunamadı.');
+                $lock = cfg('app_storage') === 'sqlite' ? '' : ' FOR UPDATE';
+                if (!row('SELECT id FROM books WHERE id = ?' . $lock, [$bid])) throw new DomainException('Kitap bulunamadı.');
                 $available = book_stock($bid);
                 if ($adet > $available) throw new DomainException("Stok yetersiz (mevcut: $available adet).");
                 q('INSERT INTO stock_out (book_id, customer_id, tarih, adet, koli, alan_kisi, teslim_yeri, aciklama) VALUES (?,?,?,?,?,?,?,?)',

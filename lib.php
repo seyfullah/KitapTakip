@@ -6,11 +6,41 @@ function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; ret
 function db(): PDO {
     static $pdo;
     if (!$pdo) {
-        $pdo = new PDO('mysql:host=' . cfg('db_host') . ';dbname=' . cfg('db_name') . ';charset=utf8mb4',
-            cfg('db_user'), cfg('db_pass'), [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]);
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ];
+        if (cfg('app_storage') === 'sqlite') {
+            if (!in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+                throw new RuntimeException('APP_STORAGE=sqlite için PHP pdo_sqlite eklentisi gerekir.');
+            }
+            $path = (string) cfg('app_data_file');
+            $dir = dirname($path);
+            if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
+                throw new RuntimeException("Veri klasörü oluşturulamadı: $dir");
+            }
+            $isNewFile = !is_file($path);
+            $previousUmask = umask(0007);
+            try {
+                $pdo = new PDO('sqlite:' . $path, null, null, $options);
+            } finally {
+                umask($previousUmask);
+            }
+            if ($isNewFile && !chmod($path, 0660)) {
+                throw new RuntimeException("Veri dosyası izinleri ayarlanamadı: $path");
+            }
+            $pdo->exec('PRAGMA foreign_keys = ON');
+            $pdo->exec('PRAGMA busy_timeout = 5000');
+            $pdo->sqliteCreateFunction('CONCAT', static fn(...$args) => implode('', array_map(static fn($v) => (string) ($v ?? ''), $args)));
+            $pdo->sqliteCreateFunction('IF', static fn($condition, $yes, $no) => $condition ? $yes : $no, 3);
+            $pdo->sqliteCreateFunction('DATE_FORMAT', static function ($date, $format) {
+                $map = ['%Y' => 'Y', '%m' => 'm', '%d' => 'd'];
+                return date(strtr((string) $format, $map), strtotime((string) $date));
+            }, 2);
+        } else {
+            $pdo = new PDO('mysql:host=' . cfg('db_host') . ';dbname=' . cfg('db_name') . ';charset=utf8mb4',
+                cfg('db_user'), cfg('db_pass'), $options);
+        }
     }
     return $pdo;
 }
@@ -433,6 +463,12 @@ function send_reminder_sms(array $customer, float $balance): void {
  * Başarısız veya iletişim bilgisi eksik kayıtlar sonraki çalıştırmada tekrar denenebilir.
  */
 function send_weekly_reminders(): array {
+    if (cfg('app_storage') === 'sqlite') {
+        throw new RuntimeException('Yerel dosya modunda gerçek e-posta/SMS gönderimi devre dışıdır.');
+    }
+    if (cfg('app_storage') === 'sqlite') {
+        throw new RuntimeException('Yerel dosya modunda gerçek e-posta/SMS gönderimi devre dışıdır.');
+    }
     $configured = reminder_channels_configured();
     if (!$configured['email']) throw new RuntimeException('E-posta için MAIL_FROM_EMAIL yapılandırılmalıdır.');
     if (!$configured['sms']) throw new RuntimeException('SMS için Twilio hesap bilgileri yapılandırılmalıdır.');

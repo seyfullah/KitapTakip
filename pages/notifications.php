@@ -1,13 +1,17 @@
 <?php
 $configured = reminder_channels_configured();
+$localOnly = cfg('app_storage') === 'sqlite';
 layout_head('Haftalık Alacak Bildirimleri', 'notifications');
 ?>
 <div class="cards">
   <div class="kpi"><small>Çalışma zamanı</small><div>Pazartesi · 08.00</div><small>Europe/Istanbul</small></div>
-  <div class="kpi <?= $configured['email'] ? '' : 'bad' ?>"><small>E-posta</small><div><?= $configured['email'] ? 'Hazır' : 'Yapılandırılmadı' ?></div></div>
-  <div class="kpi <?= $configured['sms'] ? '' : 'bad' ?>"><small>SMS (Twilio)</small><div><?= $configured['sms'] ? 'Hazır' : 'Yapılandırılmadı' ?></div></div>
+  <div class="kpi <?= !$localOnly && $configured['email'] ? '' : 'bad' ?>"><small>E-posta</small><div><?= $localOnly ? 'Yerel modda kapalı' : ($configured['email'] ? 'Hazır' : 'Yapılandırılmadı') ?></div></div>
+  <div class="kpi <?= !$localOnly && $configured['sms'] ? '' : 'bad' ?>"><small>SMS (Twilio)</small><div><?= $localOnly ? 'Yerel modda kapalı' : ($configured['sms'] ? 'Hazır' : 'Yapılandırılmadı') ?></div></div>
 </div>
 <div class="card">
+  <?php if (cfg('app_storage') === 'sqlite'): ?>
+    <div class="flash">Yerel dosya modunda dış e-posta ve SMS gönderimi kapalıdır. Bu ekran yalnızca bildirim ayarlarının üretim kurulumundaki durumunu gösterir.</div>
+  <?php endif; ?>
   <p>Sistemin bakiyesi pozitif olan müşterilere haftada bir kez cari bakiye hatırlatması gönderilir. Başarılı gönderimler aynı hafta yeniden gönderilmez; başarısız veya atlanan kanallar sonraki çalıştırmada tekrar denenebilir.</p>
   <p>Gönderim için e-posta sunucusu (PHP <code>mail()</code>) ve Twilio SMS ayarları gerekir. Zamanlama için sunucunun crontab'ına şu satırı ekleyin:</p>
   <pre><code>CRON_TZ=Europe/Istanbul

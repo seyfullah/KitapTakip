@@ -1,6 +1,9 @@
 <?php
 // Ortam değişkeniyle ya da doğrudan burada ayarlayın.
 return [
+    // sqlite modu, MySQL sunucusu olmadan verileri tek bir yerel dosyada saklar.
+    'app_storage' => getenv('APP_STORAGE') ?: 'mysql',
+    'app_data_file' => getenv('APP_DATA_FILE') ?: dirname(__DIR__) . '/kitaptakip-data/kitaptakip.sqlite',
     'db_host' => getenv('DB_HOST') ?: '127.0.0.1',
     'db_name' => getenv('DB_NAME') ?: 'kitapcari',
     'db_user' => getenv('DB_USER') ?: 'root',
