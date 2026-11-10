@@ -31,6 +31,6 @@ if ($p === 'login') {
 if (empty($_SESSION['uid'])) redirect('?p=login');
 csrf_check();
 
-$pages = ['dashboard', 'books', 'stock_in', 'stock_out', 'stock_current', 'stock_in_history', 'stock_out_history', 'customers', 'sales', 'returns_customer', 'returns_supplier', 'payments', 'cari', 'overdue', 'expenses', 'donations', 'loans', 'finance', 'notifications', 'reports', 'export'];
+$pages = ['dashboard', 'books', 'stock_in', 'stock_out', 'stock_current', 'stock_in_history', 'stock_out_history', 'people', 'customers', 'sales', 'returns_customer', 'returns_stock_out', 'returns_supplier', 'payments', 'cari', 'overdue', 'expenses', 'donations', 'loans', 'finance', 'notifications', 'reports', 'export'];
 if (!in_array($p, $pages, true)) { http_response_code(404); $p = 'dashboard'; }
 require __DIR__ . '/pages/' . $p . '.php';

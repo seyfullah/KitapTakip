@@ -9,13 +9,13 @@ try {
     $legacy->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $legacy->exec(<<<'SQL'
         CREATE TABLE books (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT, yayinevi TEXT, sinif TEXT, alis_fiyati NUMERIC, satis_fiyati NUMERIC, koli_adedi INTEGER, kritik_stok INTEGER);
-        CREATE TABLE customers (id INTEGER PRIMARY KEY, tip TEXT, ad TEXT, il TEXT, ilce TEXT, telefon TEXT, eposta TEXT);
+        CREATE TABLE customers (id INTEGER PRIMARY KEY, tip TEXT, ad TEXT, il TEXT, ilce TEXT, telefon TEXT, eposta TEXT, yetkili TEXT DEFAULT '', adres TEXT DEFAULT '');
         CREATE TABLE stock_in (id INTEGER PRIMARY KEY, book_id INTEGER, tarih TEXT, adet INTEGER, aciklama TEXT);
-        CREATE TABLE stock_out (id INTEGER PRIMARY KEY, book_id INTEGER, customer_id INTEGER, tarih TEXT, adet INTEGER, koli NUMERIC, alan_kisi TEXT NOT NULL, teslim_yeri TEXT NOT NULL, aciklama TEXT);
+        CREATE TABLE stock_out (id INTEGER PRIMARY KEY, book_id INTEGER, customer_id INTEGER, tarih TEXT, adet INTEGER, koli NUMERIC DEFAULT 0, alan_kisi TEXT NOT NULL, teslim_yeri TEXT NOT NULL, aciklama TEXT);
         CREATE TABLE sales (id INTEGER PRIMARY KEY, customer_id INTEGER, tarih TEXT, vade_tarihi TEXT, aciklama TEXT, toplam NUMERIC);
-        CREATE TABLE sale_items (id INTEGER PRIMARY KEY, sale_id INTEGER, book_id INTEGER, adet INTEGER, koli NUMERIC, birim_fiyat NUMERIC, toplam NUMERIC);
+        CREATE TABLE sale_items (id INTEGER PRIMARY KEY, sale_id INTEGER, book_id INTEGER, adet INTEGER, koli NUMERIC NOT NULL DEFAULT 0, birim_fiyat NUMERIC, toplam NUMERIC);
         INSERT INTO books VALUES (1, 'BK', 'Kitap', 'Eski yayinevi', 'Eski sinif', 5, 10, 10, 0);
-        INSERT INTO customers VALUES (1, 'Okul', 'Musteri', '', '', '', '');
+        INSERT INTO customers (id, tip, ad, il, ilce, telefon, eposta) VALUES (1, 'Okul', 'Musteri', '', '', '', '');
         INSERT INTO stock_in VALUES (1, 1, '2025-01-01', 20, '');
         INSERT INTO stock_out VALUES (1, 1, 1, '2025-01-02', 1, 0.1, 'Eski teslim alan', 'Eski adres', '');
         INSERT INTO sales VALUES (1, 1, '2025-01-03', '2025-02-01', '', 20);
@@ -31,14 +31,21 @@ try {
         if (!$ok) throw new RuntimeException($message);
     };
 
-    $check((int) $pdo->query('PRAGMA user_version')->fetchColumn() === 1, 'Şema sürümü güncellenmedi.');
+    $check((int) $pdo->query('PRAGMA user_version')->fetchColumn() === 3, 'Şema sürümü güncellenmedi.');
     $check(count(stock_report()) === 1 && book_stock(1) === 17, 'Mevcut stok korunmadı.');
     $check((float) val('SELECT maliyet_birim FROM sale_items WHERE id = 1') === 5.0, 'Satış maliyeti doldurulmadı.');
     $old = row('SELECT alan_kisi, teslim_yeri FROM stock_out WHERE id = 1');
     $check($old['alan_kisi'] === 'Eski teslim alan' && $old['teslim_yeri'] === 'Eski adres', 'Eski teslim bilgileri korunmadı.');
     $check(val('SELECT yayinevi FROM books WHERE id = 1') === 'Eski yayinevi', 'Eski kitap bilgileri korunmadı.');
+    foreach (['books' => 'koli_adedi', 'stock_out' => 'koli', 'sale_items' => 'koli'] as $table => $column) {
+        $columns = array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(), 'name');
+        $check(!in_array($column, $columns, true), "$table tablosundaki koli sütunu kaldırılmadı.");
+    }
+    q('INSERT INTO sale_items (sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?)', [1, 1, 1, 10, 5, 10]);
+    $check((int) val('SELECT adet FROM sale_items WHERE id = 2') === 1, 'Eski şemaya yeni satış satırı yazılamadı.');
+    q('DELETE FROM sale_items WHERE id = 2');
 
-    insert_stock_out(1, 1, '2025-01-04', 1, 0.1, 'Götüren', '');
+    insert_stock_out(1, 1, '2025-01-04', 1, 'Götüren', '');
     $check(book_stock(1) === 16, 'Eski dosyaya yeni stok çıkışı yazılamadı.');
     $new = row('SELECT goturen_kisi, alan_kisi, teslim_yeri FROM stock_out WHERE id = 2');
     $check($new['goturen_kisi'] === 'Götüren' && $new['alan_kisi'] === '' && $new['teslim_yeri'] === '', 'Yeni stok çıkışı yanlış kaydedildi.');
@@ -47,6 +54,25 @@ try {
     sqlite_upgrade($pdo);
     $check((float) val('SELECT maliyet_birim FROM sale_items WHERE id = 1') === 5.0, 'Tekrarlanan güncelleme eski maliyeti değiştirdi.');
     $check((float) financial_summary()['profit'] === 10.0, 'Finans özeti eski verilerle çalışmıyor.');
+    q("UPDATE stock_in SET teslim_alan = 'Önceki kişi' WHERE id = 1");
+    q("UPDATE stock_out SET goturen_kisi = 'Önceki kişi' WHERE id = 1");
+    $pdo->exec('PRAGMA user_version = 1');
+    sqlite_upgrade($pdo);
+    $check((int) val("SELECT COUNT(*) FROM people WHERE ad = 'Önceki kişi'") === 1, 'Mevcut kişi adları tekilleştirilerek aktarılmadı.');
+    q("UPDATE people SET ad = 'Yeni kişi' WHERE ad = 'Önceki kişi'");
+    sqlite_upgrade($pdo);
+    $check((int) val("SELECT COUNT(*) FROM people WHERE ad = 'Önceki kişi'") === 0, 'Geçiş tekrar çalıştırıldığında eski ad yeniden eklendi.');
+    $check(val('SELECT teslim_alan FROM stock_in WHERE id = 1') === 'Önceki kişi', 'Geçmiş kişi adı değişti.');
+    $pdo->exec('DROP TABLE stock_out_returns');
+    $pdo->exec('PRAGMA user_version = 2');
+    sqlite_upgrade($pdo);
+    q('INSERT INTO stock_out_returns (stock_out_id, tarih, adet, aciklama) VALUES (?,?,?,?)', [1, '2025-01-05', 1, '']);
+    $check(book_stock(1) === 17, 'Stok çıkış iadesi stoka eklenmedi.');
+    $stock = stock_report()[0];
+    $check((int) $stock['stok'] === 17 && (int) $stock['diger_cikis'] === 1, 'Stok raporunda iade hesaba katılmadı.');
+    $sets = export_sets();
+    $check(count($sets['Stok Çıkış İadeleri'][1]) === 1, 'Stok çıkış iadesi dışa aktarılmadı.');
+    $check((float) financial_summary()['profit'] === 10.0, 'Satış dışı iade kâr/zararı değiştirdi.');
     echo "SQLite yükseltmesi ve eski veriler doğrulandı.\n";
 } finally {
     unlink($path);

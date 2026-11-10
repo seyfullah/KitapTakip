@@ -4,7 +4,7 @@ declare(strict_types=1);
 function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; return $c[$k] ?? null; }
 
 function sqlite_upgrade(PDO $pdo): void {
-    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 1) return;
+    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 3) return;
 
     $pdo->exec('BEGIN IMMEDIATE');
     try {
@@ -27,6 +27,25 @@ function sqlite_upgrade(PDO $pdo): void {
             if ($schema === false) throw new RuntimeException('SQLite şema dosyası okunamadı.');
             $pdo->exec($schema);
             $pdo->exec('PRAGMA user_version = 1');
+        }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 2) {
+            $pdo->exec('CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY AUTOINCREMENT, ad TEXT NOT NULL UNIQUE)');
+            $pdo->exec("INSERT OR IGNORE INTO people (ad) SELECT TRIM(teslim_alan) FROM stock_in WHERE TRIM(teslim_alan) <> ''");
+            $pdo->exec("INSERT OR IGNORE INTO people (ad) SELECT TRIM(goturen_kisi) FROM stock_out WHERE TRIM(goturen_kisi) <> ''");
+            foreach (['books' => 'koli_adedi', 'stock_out' => 'koli', 'sale_items' => 'koli'] as $table => $column) {
+                $columns = array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+                if (in_array($column, $columns, true)) $pdo->exec("ALTER TABLE $table DROP COLUMN $column");
+            }
+            $pdo->exec('PRAGMA user_version = 2');
+        }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 3) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS stock_out_returns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stock_out_id INTEGER NOT NULL REFERENCES stock_out(id),
+                tarih TEXT NOT NULL, adet INTEGER NOT NULL, aciklama TEXT NOT NULL DEFAULT ''
+            )");
+            $pdo->exec('CREATE INDEX IF NOT EXISTS stock_out_returns_out ON stock_out_returns(stock_out_id)');
+            $pdo->exec('PRAGMA user_version = 3');
         }
         $pdo->exec('COMMIT');
     } catch (Throwable $e) {
@@ -82,9 +101,9 @@ function rows(string $sql, array $p = []): array { return q($sql, $p)->fetchAll(
 function row(string $sql, array $p = []): ?array { return q($sql, $p)->fetch() ?: null; }
 function val(string $sql, array $p = []) { $r = q($sql, $p)->fetch(PDO::FETCH_NUM); return $r ? $r[0] : null; }
 
-function insert_stock_out(int $bookId, int $customerId, string $date, int $units, float $cartons, string $carrier, string $description): void {
-    $fields = ['book_id', 'customer_id', 'tarih', 'adet', 'koli', 'goturen_kisi', 'aciklama'];
-    $values = [$bookId, $customerId, $date, $units, $cartons, $carrier, $description];
+function insert_stock_out(int $bookId, int $customerId, string $date, int $units, string $carrier, string $description): void {
+    $fields = ['book_id', 'customer_id', 'tarih', 'adet', 'goturen_kisi', 'aciklama'];
+    $values = [$bookId, $customerId, $date, $units, $carrier, $description];
     if (cfg('app_storage') === 'sqlite') {
         $columns = array_column(db()->query('PRAGMA table_info(stock_out)')->fetchAll(), 'name');
         foreach (['alan_kisi', 'teslim_yeri'] as $column) {
@@ -138,40 +157,27 @@ function customer_opts(bool $blank = false, string $tip = ''): array {
     foreach (rows($sql, $tip ? [$tip] : []) as $c) $o[$c['id']] = $c['ad'] . ' (' . $c['tip'] . ')';
     return $o;
 }
-function stock_quantity(string $rawUnits, string $rawCartons, string $type, array $book): array {
-    if ($type === '') {
-        if ($rawUnits !== '' && $rawCartons === '') $type = 'adet';
-        elseif ($rawCartons !== '' && $rawUnits === '') $type = 'koli';
+function stock_quantity(string $rawUnits): int {
+    if (!preg_match('/^[1-9]\d*$/', $rawUnits) || filter_var($rawUnits, FILTER_VALIDATE_INT) === false) {
+        throw new DomainException('Pozitif bir adet girin.');
     }
-
-    $cartonSize = max(1, (int) $book['koli_adedi']);
-    if ($type === 'adet' && $rawCartons === '' && preg_match('/^[1-9]\d*$/', $rawUnits)) {
-        $units = (int) $rawUnits;
-        return [$units, round($units / $cartonSize, 2)];
-    }
-    if ($type === 'koli' && $rawCartons !== '' && is_numeric(str_replace(',', '.', $rawCartons))) {
-        $cartons = dec($rawCartons);
-        $units = (int) round($cartons * $cartonSize);
-        if ($cartons > 0 && $units > 0 && ($rawUnits === '' || (preg_match('/^[1-9]\d*$/', $rawUnits) && (int) $rawUnits === $units))) {
-            return [$units, $cartons];
-        }
-    }
-    throw new DomainException('Adet veya koli alanlarından yalnızca birine geçerli bir değer girin.');
+    return (int) $rawUnits;
 }
 
 /* ---------------- İş mantığı ---------------- */
 
-/** Güncel stok = giriş + müşteri iadeleri - satış - çıkış - tedarikçi iadeleri. */
+/** Güncel stok = giriş + iadeler - satış - çıkış - tedarikçi iadeleri. */
 function stock_report(): array {
-    return rows("SELECT b.id, b.kod, b.ad, b.koli_adedi, b.kritik_stok,
+    return rows("SELECT b.id, b.kod, b.ad, b.kritik_stok,
         COALESCE(si.t,0) AS giris, COALESCE(sa.t,0) - COALESCE(cr.t,0) AS satilan,
-        COALESCE(so.t,0) + COALESCE(sr.t,0) AS diger_cikis,
-        COALESCE(si.t,0) + COALESCE(cr.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) - COALESCE(sr.t,0) AS stok,
-        (COALESCE(si.t,0) + COALESCE(cr.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) - COALESCE(sr.t,0)) * b.alis_fiyati AS stok_degeri
+        COALESCE(so.t,0) - COALESCE(sor.t,0) + COALESCE(sr.t,0) AS diger_cikis,
+        COALESCE(si.t,0) + COALESCE(cr.t,0) + COALESCE(sor.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) - COALESCE(sr.t,0) AS stok,
+        (COALESCE(si.t,0) + COALESCE(cr.t,0) + COALESCE(sor.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) - COALESCE(sr.t,0)) * b.alis_fiyati AS stok_degeri
         FROM books b
         LEFT JOIN (SELECT book_id, SUM(adet) t FROM stock_in GROUP BY book_id) si ON si.book_id = b.id
         LEFT JOIN (SELECT book_id, SUM(adet) t FROM sale_items GROUP BY book_id) sa ON sa.book_id = b.id
         LEFT JOIN (SELECT book_id, SUM(adet) t FROM stock_out GROUP BY book_id) so ON so.book_id = b.id
+        LEFT JOIN (SELECT o.book_id, SUM(r.adet) t FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id GROUP BY o.book_id) sor ON sor.book_id = b.id
         LEFT JOIN (SELECT si.book_id, SUM(cr.adet) t FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id GROUP BY si.book_id) cr ON cr.book_id = b.id
         LEFT JOIN (SELECT book_id, SUM(adet) t FROM supplier_returns GROUP BY book_id) sr ON sr.book_id = b.id
         ORDER BY b.ad");
@@ -182,8 +188,9 @@ function book_stock(int $bookId): int {
         - (SELECT COALESCE(SUM(adet),0) FROM sale_items WHERE book_id = :b2)
         - (SELECT COALESCE(SUM(adet),0) FROM stock_out WHERE book_id = :b3)
         + (SELECT COALESCE(SUM(cr.adet),0) FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id WHERE si.book_id = :b4)
+        + (SELECT COALESCE(SUM(r.adet),0) FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id WHERE o.book_id = :b6)
         - (SELECT COALESCE(SUM(adet),0) FROM supplier_returns WHERE book_id = :b5) s',
-        ['b' => $bookId, 'b2' => $bookId, 'b3' => $bookId, 'b4' => $bookId, 'b5' => $bookId]);
+        ['b' => $bookId, 'b2' => $bookId, 'b3' => $bookId, 'b4' => $bookId, 'b5' => $bookId, 'b6' => $bookId]);
     return (int) $r['s'];
 }
 
@@ -309,17 +316,17 @@ function report(string $key, array $f = []): array {
 
     switch ($key) {
         case 'kitap':
-            $data = rows("SELECT b.id, b.kod, b.ad, SUM(si.adet) adet, ROUND(SUM(si.koli),2) koli, SUM(si.toplam) tutar $base $w GROUP BY b.id ORDER BY tutar DESC", $p);
+            $data = rows("SELECT b.id, b.kod, b.ad, SUM(si.adet) adet, SUM(si.toplam) tutar $base $w GROUP BY b.id ORDER BY tutar DESC", $p);
             $rw = ' WHERE 1=1'; $rp = [];
             if ($from !== '') { $rw .= ' AND cr.tarih >= :rf'; $rp['rf'] = $from; }
             if ($to !== '') { $rw .= ' AND cr.tarih <= :rt'; $rp['rt'] = $to; }
             if (!empty($f['book_id'])) { $rw .= ' AND si.book_id = :rb'; $rp['rb'] = $f['book_id']; }
-            $returns = rows('SELECT si.book_id, SUM(cr.adet) adet, SUM(cr.koli) koli, SUM(cr.toplam) tutar
+            $returns = rows('SELECT si.book_id, SUM(cr.adet) adet, SUM(cr.toplam) tutar
                 FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id' . $rw . ' GROUP BY si.book_id', $rp);
             foreach ($returns as $return) {
                 foreach ($data as &$line) {
                     if ((int) $line['id'] === (int) $return['book_id']) {
-                        $line['adet'] -= $return['adet']; $line['koli'] -= $return['koli']; $line['tutar'] -= $return['tutar'];
+                        $line['adet'] -= $return['adet']; $line['tutar'] -= $return['tutar'];
                         break;
                     }
                 }
@@ -327,11 +334,11 @@ function report(string $key, array $f = []): array {
             }
             foreach ($data as &$line) unset($line['id']);
             unset($line);
-            return [['Kod', 'Kitap', 'Adet', 'Koli', 'Satış Tutarı'], $data];
+            return [['Kod', 'Kitap', 'Adet', 'Satış Tutarı'], $data];
         case 'okul': case 'kirtasiye':
             $tip = $key === 'okul' ? 'Okul' : 'Kırtasiye';
-            return [[$tip, 'İl', 'İlçe', 'Adet', 'Koli', 'Satış Tutarı'],
-                rows("SELECT c.ad, c.il, c.ilce, SUM(si.adet) adet, ROUND(SUM(si.koli),2) koli, SUM(si.toplam) tutar $base $w AND c.tip = '$tip' GROUP BY c.id ORDER BY tutar DESC", $p)];
+            return [[$tip, 'İl', 'İlçe', 'Adet', 'Satış Tutarı'],
+                rows("SELECT c.ad, c.il, c.ilce, SUM(si.adet) adet, SUM(si.toplam) tutar $base $w AND c.tip = '$tip' GROUP BY c.id ORDER BY tutar DESC", $p)];
         case 'ilce':
             return [['İl', 'İlçe', 'Adet', 'Satış Tutarı'],
                 rows("SELECT c.il, c.ilce, SUM(si.adet) adet, SUM(si.toplam) tutar $base $w GROUP BY c.il, c.ilce ORDER BY tutar DESC", $p)];
@@ -356,8 +363,8 @@ function report(string $key, array $f = []): array {
         case 'stok':
             $out = [];
             foreach (stock_report() as $s) $out[] = ['kod' => $s['kod'], 'ad' => $s['ad'], 'giris' => $s['giris'], 'satilan' => $s['satilan'], 'diger_cikis' => $s['diger_cikis'],
-                'stok' => $s['stok'], 'koli' => $s['koli_adedi'] > 0 ? round($s['stok'] / $s['koli_adedi'], 2) : '', 'kritik' => $s['kritik_stok'], 'durum' => $s['stok'] <= $s['kritik_stok'] ? 'KRİTİK' : 'Yeterli', 'deger' => $s['stok_degeri']];
-            return [['Kod', 'Kitap', 'Toplam Giriş', 'Satılan', 'Diğer Çıkış', 'Güncel Stok', 'Koli', 'Kritik Seviye', 'Durum', 'Stok Değeri (Alış)'], $out];
+                'stok' => $s['stok'], 'kritik' => $s['kritik_stok'], 'durum' => $s['stok'] <= $s['kritik_stok'] ? 'KRİTİK' : 'Yeterli', 'deger' => $s['stok_degeri']];
+            return [['Kod', 'Kitap', 'Toplam Giriş', 'Satılan', 'Diğer Çıkış', 'Güncel Stok', 'Kritik Seviye', 'Durum', 'Stok Değeri (Alış)'], $out];
         case 'vadesi':
             $out = [];
             foreach (overdue_rows(!empty($f['customer_id']) ? (int) $f['customer_id'] : null) as $o)
@@ -392,15 +399,16 @@ function report(string $key, array $f = []): array {
 /** Tüm tabloları Excel / Google Sheets için hazırlar. */
 function export_sets(): array {
     $f = [];
-    $books = rows('SELECT kod, ad, alis_fiyati, satis_fiyati, koli_adedi, kritik_stok FROM books ORDER BY ad');
+    $books = rows('SELECT kod, ad, alis_fiyati, satis_fiyati, kritik_stok FROM books ORDER BY ad');
     $cust = rows('SELECT id, tip, ad, il, ilce, yetkili, telefon, eposta, adres FROM customers ORDER BY ad');
-    $sales = rows('SELECT s.id satis_no, s.tarih, s.vade_tarihi, c.ad musteri, c.tip, c.il, c.ilce, b.kod, b.ad kitap, si.adet, si.koli, si.birim_fiyat, si.toplam
+    $sales = rows('SELECT s.id satis_no, s.tarih, s.vade_tarihi, c.ad musteri, c.tip, c.il, c.ilce, b.kod, b.ad kitap, si.adet, si.birim_fiyat, si.toplam
         FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY s.tarih, s.id');
     $pay = rows('SELECT p.tarih, c.ad musteri, p.tutar, p.yontem, p.aciklama FROM payments p JOIN customers c ON c.id = p.customer_id ORDER BY p.tarih, p.id');
     $stockIn = rows('SELECT i.tarih, b.kod, b.ad kitap, i.adet, i.teslim_alan, i.aciklama FROM stock_in i JOIN books b ON b.id = i.book_id ORDER BY i.tarih, i.id');
-    $stockOut = rows('SELECT o.tarih, b.kod, b.ad kitap, c.ad musteri, o.goturen_kisi, o.adet, o.koli, o.aciklama
+    $stockOut = rows('SELECT o.tarih, b.kod, b.ad kitap, c.ad musteri, o.goturen_kisi, o.adet, o.aciklama
         FROM stock_out o JOIN books b ON b.id = o.book_id JOIN customers c ON c.id = o.customer_id ORDER BY o.tarih, o.id');
     $customerReturns = rows('SELECT cr.tarih, s.id satis_no, c.ad musteri, b.kod, b.ad kitap, cr.adet, cr.toplam, cr.aciklama FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY cr.tarih, cr.id');
+    $stockReturns = rows('SELECT r.tarih, o.id cikis_no, c.ad musteri, b.kod, b.ad kitap, r.adet, r.aciklama FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id JOIN customers c ON c.id = o.customer_id JOIN books b ON b.id = o.book_id ORDER BY r.tarih, r.id');
     $supplierReturns = rows('SELECT r.tarih, r.tedarikci, b.kod, b.ad kitap, r.adet, r.toplam, r.aciklama FROM supplier_returns r JOIN books b ON b.id = r.book_id ORDER BY r.tarih, r.id');
     $expenses = rows('SELECT tarih, kategori, tutar, yontem, aciklama FROM expenses ORDER BY tarih, id');
     $donations = rows('SELECT tarih, bagisci, tutar, yontem, aciklama FROM donations ORDER BY tarih, id');
@@ -408,11 +416,12 @@ function export_sets(): array {
     $loanPayments = rows('SELECT p.tarih, l.alacakli, p.tutar, p.yontem, p.aciklama FROM loan_payments p JOIN loans l ON l.id = p.loan_id ORDER BY p.tarih, p.id');
     $profitLoss = financial_summary();
     return [
-        'Kitaplar' => [['Kod', 'Kitap Adı', 'Alış Fiyatı', 'Satış Fiyatı', 'Koli Adedi', 'Kritik Stok'], $books],
+        'Kitaplar' => [['Kod', 'Kitap Adı', 'Alış Fiyatı', 'Satış Fiyatı', 'Kritik Stok'], $books],
         'Müşteriler' => [['No', 'Tip', 'Ad', 'İl', 'İlçe', 'Yetkili', 'Telefon', 'E-posta', 'Adres'], $cust],
         'Stok Girişleri' => [['Tarih', 'Kod', 'Kitap', 'Adet', 'Teslim Alan', 'Açıklama'], $stockIn],
-        'Stok Çıkışları' => [['Tarih', 'Kod', 'Kitap', 'Müşteri', 'Götüren Kişi', 'Adet', 'Koli', 'Açıklama'], $stockOut],
+        'Stok Çıkışları' => [['Tarih', 'Kod', 'Kitap', 'Müşteri', 'Götüren Kişi', 'Adet', 'Açıklama'], $stockOut],
         'Müşteri İadeleri' => [['Tarih', 'Satış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Tutar', 'Açıklama'], $customerReturns],
+        'Stok Çıkış İadeleri' => [['Tarih', 'Çıkış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Açıklama'], $stockReturns],
         'Tedarikçi İadeleri' => [['Tarih', 'Tedarikçi', 'Kod', 'Kitap', 'Adet', 'Tutar', 'Açıklama'], $supplierReturns],
         'Giderler' => [['Tarih', 'Kategori', 'Tutar', 'Yöntem', 'Açıklama'], $expenses],
         'Bağışlar' => [['Tarih', 'Bağışçı', 'Tutar', 'Yöntem', 'Açıklama'], $donations],
@@ -421,7 +430,7 @@ function export_sets(): array {
         'Kâr Zarar' => [['Satışlar', 'Müşteri İadeleri', 'Net Satış', 'Kitap Maliyeti', 'Giderler', 'Bağışlar', 'Net Kâr/Zarar', 'Kalan Borç'], [[
             $profitLoss['sales'], $profitLoss['returns'], $profitLoss['net_sales'], $profitLoss['cost'], $profitLoss['expenses'], $profitLoss['donations'], $profitLoss['profit'], $profitLoss['debt'],
         ]]],
-        'Satışlar' => [['Satış No', 'Tarih', 'Vade', 'Müşteri', 'Tip', 'İl', 'İlçe', 'Kod', 'Kitap', 'Adet', 'Koli', 'Birim Fiyat', 'Tutar'], $sales],
+        'Satışlar' => [['Satış No', 'Tarih', 'Vade', 'Müşteri', 'Tip', 'İl', 'İlçe', 'Kod', 'Kitap', 'Adet', 'Birim Fiyat', 'Tutar'], $sales],
         'Tahsilatlar' => [['Tarih', 'Müşteri', 'Tutar', 'Yöntem', 'Açıklama'], $pay],
         'Güncel Stok' => report('stok', $f),
         'Cari Özet' => report('cari', $f),
@@ -663,8 +672,8 @@ function send_weekly_reminders(): array {
 
 function layout_head(string $title, string $page): void {
     $menu = ['dashboard' => '📊 Panel', 'books' => '📚 Kitaplar', 'stock_in' => 'Stok Girişi', 'stock_out' => 'Stok Çıkışı',
-        'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri',
-        'sales' => '🚚 Satışlar', 'returns_customer' => 'Müşteri İadesi', 'returns_supplier' => 'Tedarikçi İadesi',
+        'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri', 'people' => 'Kişiler',
+        'sales' => '🚚 Satışlar', 'returns_customer' => 'Müşteri İadesi', 'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi',
         'customers' => '🏫 Müşteriler', 'payments' => '💰 Tahsilat', 'cari' => '🧾 Cari / Ekstre', 'overdue' => '⏰ Vadeli Alacak',
         'expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'finance' => 'Kâr / Zarar',
         'notifications' => '🔔 Bildirimler', 'reports' => '📋 Raporlar', 'export' => '📤 Excel / Sheets'];
@@ -678,7 +687,7 @@ function layout_foot(): void { echo '</main><footer>Kitap Dağıtım & Cari</foo
 
 function table(array $head, array $data, array $opts = []): void {
     $money = $opts['money'] ?? []; $ints = $opts['int'] ?? []; $totals = $opts['totals'] ?? [];
-    echo '<div class="table-wrap"><table class="sortable-table"><thead><tr>';
+    echo '<label class="table-filter no-print">Listede ara<input type="search" placeholder="Filtrele" aria-label="Listede ara"></label><div class="table-wrap"><table class="sortable-table"><thead><tr>';
     foreach ($head as $hh) echo '<th scope="col"><button class="sort-button" type="button"><span>' . h($hh) . '</span><span class="sort-indicator" aria-hidden="true">↕</span></button></th>';
     echo '</tr></thead><tbody>';
     $sum = [];

@@ -10,9 +10,13 @@ CREATE TABLE IF NOT EXISTS books (
   ad VARCHAR(200) NOT NULL,
   alis_fiyati DECIMAL(12,2) NOT NULL DEFAULT 0,
   satis_fiyati DECIMAL(12,2) NOT NULL DEFAULT 0,
-  koli_adedi INT NOT NULL DEFAULT 1,
   kritik_stok INT NOT NULL DEFAULT 0,
   KEY (ad)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS people (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ad VARCHAR(120) NOT NULL UNIQUE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS stock_in (
@@ -44,12 +48,21 @@ CREATE TABLE IF NOT EXISTS stock_out (
   customer_id INT NOT NULL,
   tarih DATE NOT NULL,
   adet INT NOT NULL,
-  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
   goturen_kisi VARCHAR(120) NOT NULL,
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
   KEY (tarih),
   FOREIGN KEY (book_id) REFERENCES books(id),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS stock_out_returns (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  stock_out_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  adet INT NOT NULL,
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (stock_out_id),
+  FOREIGN KEY (stock_out_id) REFERENCES stock_out(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS sales (
@@ -68,7 +81,6 @@ CREATE TABLE IF NOT EXISTS sale_items (
   sale_id INT NOT NULL,
   book_id INT NOT NULL,
   adet INT NOT NULL,
-  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
   birim_fiyat DECIMAL(12,2) NOT NULL,
   maliyet_birim DECIMAL(12,2) NOT NULL DEFAULT 0,
   toplam DECIMAL(14,2) NOT NULL,
@@ -81,7 +93,6 @@ CREATE TABLE IF NOT EXISTS customer_returns (
   sale_item_id INT NOT NULL,
   tarih DATE NOT NULL,
   adet INT NOT NULL,
-  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
   birim_fiyat DECIMAL(12,2) NOT NULL,
   maliyet_birim DECIMAL(12,2) NOT NULL DEFAULT 0,
   toplam DECIMAL(14,2) NOT NULL,
@@ -96,7 +107,6 @@ CREATE TABLE IF NOT EXISTS supplier_returns (
   tarih DATE NOT NULL,
   tedarikci VARCHAR(200) NOT NULL,
   adet INT NOT NULL,
-  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
   birim_fiyat DECIMAL(12,2) NOT NULL,
   toplam DECIMAL(14,2) NOT NULL,
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
@@ -182,6 +192,39 @@ SET @add_stock_carrier = (SELECT COUNT(*) = 0 FROM information_schema.columns
   WHERE table_schema = DATABASE() AND table_name = 'stock_out' AND column_name = 'goturen_kisi');
 SET @migration_sql = IF(@add_stock_carrier,
   'ALTER TABLE stock_out ADD COLUMN goturen_kisi VARCHAR(120) NOT NULL DEFAULT ''''', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  name VARCHAR(100) PRIMARY KEY
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO people (ad)
+  SELECT TRIM(teslim_alan) FROM stock_in
+  WHERE TRIM(teslim_alan) <> '' AND NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = 'people_from_stock');
+INSERT IGNORE INTO people (ad)
+  SELECT TRIM(goturen_kisi) FROM stock_out
+  WHERE TRIM(goturen_kisi) <> '' AND NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = 'people_from_stock');
+INSERT IGNORE INTO schema_migrations (name) VALUES ('people_from_stock');
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'books' AND column_name = 'koli_adedi') > 0,
+  'ALTER TABLE books DROP COLUMN koli_adedi', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'stock_out' AND column_name = 'koli') > 0,
+  'ALTER TABLE stock_out DROP COLUMN koli', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'koli') > 0,
+  'ALTER TABLE sale_items DROP COLUMN koli', 'SET @migration_noop = 1');
 PREPARE migration_stmt FROM @migration_sql;
 EXECUTE migration_stmt;
 DEALLOCATE PREPARE migration_stmt;

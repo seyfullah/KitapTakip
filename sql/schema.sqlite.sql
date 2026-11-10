@@ -12,10 +12,14 @@ CREATE TABLE IF NOT EXISTS books (
   ad TEXT NOT NULL,
   alis_fiyati NUMERIC NOT NULL DEFAULT 0,
   satis_fiyati NUMERIC NOT NULL DEFAULT 0,
-  koli_adedi INTEGER NOT NULL DEFAULT 1,
   kritik_stok INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS books_ad ON books(ad);
+
+CREATE TABLE IF NOT EXISTS people (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ad TEXT NOT NULL UNIQUE
+);
 
 CREATE TABLE IF NOT EXISTS stock_in (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,11 +50,19 @@ CREATE TABLE IF NOT EXISTS stock_out (
   customer_id INTEGER NOT NULL REFERENCES customers(id),
   tarih TEXT NOT NULL,
   adet INTEGER NOT NULL,
-  koli NUMERIC NOT NULL DEFAULT 0,
   goturen_kisi TEXT NOT NULL,
   aciklama TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS stock_out_tarih ON stock_out(tarih);
+
+CREATE TABLE IF NOT EXISTS stock_out_returns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stock_out_id INTEGER NOT NULL REFERENCES stock_out(id),
+  tarih TEXT NOT NULL,
+  adet INTEGER NOT NULL,
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS stock_out_returns_out ON stock_out_returns(stock_out_id);
 
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +80,6 @@ CREATE TABLE IF NOT EXISTS sale_items (
   sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
   book_id INTEGER NOT NULL REFERENCES books(id),
   adet INTEGER NOT NULL,
-  koli NUMERIC NOT NULL DEFAULT 0,
   birim_fiyat NUMERIC NOT NULL,
   maliyet_birim NUMERIC NOT NULL DEFAULT 0,
   toplam NUMERIC NOT NULL
@@ -79,7 +90,6 @@ CREATE TABLE IF NOT EXISTS customer_returns (
   sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
   tarih TEXT NOT NULL,
   adet INTEGER NOT NULL,
-  koli NUMERIC NOT NULL DEFAULT 0,
   birim_fiyat NUMERIC NOT NULL,
   maliyet_birim NUMERIC NOT NULL DEFAULT 0,
   toplam NUMERIC NOT NULL,
@@ -93,7 +103,6 @@ CREATE TABLE IF NOT EXISTS supplier_returns (
   tarih TEXT NOT NULL,
   tedarikci TEXT NOT NULL,
   adet INTEGER NOT NULL,
-  koli NUMERIC NOT NULL DEFAULT 0,
   birim_fiyat NUMERIC NOT NULL,
   toplam NUMERIC NOT NULL,
   aciklama TEXT NOT NULL DEFAULT ''

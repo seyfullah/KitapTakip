@@ -10,42 +10,32 @@
   const collator = new Intl.Collator('tr', {numeric: true, sensitivity: 'base'});
 
   document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-stock-quantity]').forEach(form => {
-      const units = form.querySelector('[data-stock-units]');
-      const cartons = form.querySelector('[data-stock-cartons]');
-      const mode = form.querySelector('[name="miktar_tipi"]');
-      const book = form.querySelector('[data-carton-book]');
-      const label = form.querySelector('[data-carton-label]');
-      const cartonSize = () => Number(book.selectedOptions[0]?.dataset.cartonSize || 0);
-      const syncCartonLabel = () => {
-        label.textContent = cartonSize() || '—';
-        if (mode.value === 'koli') units.value = Math.round((Number(cartons.value) || 0) * cartonSize()) || '';
-      };
-
-      units.addEventListener('input', () => {
-        if (units.value) {
-          cartons.value = '';
-          units.readOnly = false;
-          mode.value = 'adet';
-        } else mode.value = '';
+    const normalize = text => text.toLocaleLowerCase('tr-TR').trim();
+    document.querySelectorAll('.person-select').forEach(select => {
+      const label = document.createElement('label');
+      label.textContent = 'Kişi listesinde ara';
+      const input = document.createElement('input');
+      input.type = 'search';
+      label.appendChild(input);
+      select.parentElement.before(label);
+      input.addEventListener('input', () => {
+        const query = normalize(input.value);
+        [...select.options].forEach(option => {
+          option.hidden = option.value !== '' && !normalize(option.textContent).includes(query);
+        });
+        if (select.selectedOptions[0]?.hidden) select.value = '';
       });
-      cartons.addEventListener('input', () => {
-        if (cartons.value) {
-          units.value = Math.round((Number(cartons.value) || 0) * cartonSize()) || '';
-          units.readOnly = true;
-          mode.value = 'koli';
-        } else {
-          units.value = '';
-          units.readOnly = false;
-          mode.value = '';
-        }
-      });
-      book.addEventListener('change', syncCartonLabel);
-      syncCartonLabel();
     });
-
     document.querySelectorAll('table.sortable-table').forEach(table => {
       const body = table.tBodies[0];
+      const filter = table.closest('.table-wrap').previousElementSibling.querySelector('input');
+      filter.addEventListener('input', () => {
+        const query = normalize(filter.value);
+        [...body.rows].forEach(row => {
+          if (row.classList.contains('tot')) row.hidden = query !== '';
+          else if (row.cells.length > 1) row.hidden = !normalize(row.textContent).includes(query);
+        });
+      });
       table.querySelectorAll('thead .sort-button').forEach((btn, col) => {
         btn.addEventListener('click', () => {
           const dir = btn.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';

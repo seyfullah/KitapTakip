@@ -14,6 +14,7 @@ h1{margin:0 0 20px;font-size:clamp(23px,3vw,30px);letter-spacing:-.7px;line-heig
 h2{font-size:17px;margin:22px 0 10px}
 footer{text-align:center;color:#99a3b5;padding:0 16px 24px;font-size:12px}
 .table-wrap{max-width:100%;overflow-x:auto;border-radius:12px;margin:0 0 18px;box-shadow:var(--shadow);-webkit-overflow-scrolling:touch}
+.table-filter{max-width:320px;margin:8px 0}
 table{border-collapse:separate;border-spacing:0;width:100%;min-width:560px;background:var(--paper);margin:0}
 th,td{border-bottom:1px solid var(--line);padding:11px 13px;text-align:left;vertical-align:middle}
 th{background:#f7f9fd;color:#5a667c;font-size:11px;font-weight:700;letter-spacing:.055em;text-transform:uppercase;white-space:nowrap}

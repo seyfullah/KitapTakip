@@ -4,16 +4,16 @@ PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulamas
 
 ## Özellikler
 
-- Kitap kartları, ayrı stok giriş/çıkış/hareket/güncel stok sayfaları, koli hesabı, otomatik satış stok düşümü ve kritik stok uyarıları
+- Kitap kartları, ayrı stok giriş/çıkış/hareket/güncel stok sayfaları, otomatik satış stok düşümü ve kritik stok uyarıları
 - Okul ve kırtasiye müşteri kartları; il, ilçe ve iletişim bilgileri
 - Vadeli satış, satış kalemleri, tahsilat ve müşteri ekstresi
 - FIFO tahsilat mahsuplaştırmasıyla gecikmiş alacak takibi
 - Yönetici paneli, grafikler ve filtrelenebilir kitap, müşteri, stok, cari ve vade raporları
 - Yazdırılabilir ekstre ve çok sekmeli Excel (`.xlsx`) dışa aktarımı
 - Google Sheets'e elle veya cron ile veri aktarımı
-- Mobil uyumlu modern arayüz; tüm listelerde sütun başlığına tıklayarak sıralama
-- Stok girişinde teslim alan, stok çıkışında götüren kişi kaydı
-- Müşteri ve tedarikçi iadeleri; stok ve müşteri bakiyesi güncellemesi
+- Mobil uyumlu modern arayüz; listelerde arama ve sütun başlığına tıklayarak sıralama
+- Yönetilebilir ortak kişi listesi; stok girişinde teslim alan, stok çıkışında götüren kişi seçimi
+- Satış, stok çıkışı ve tedarikçi iadeleri; stok ve ilgili müşteri bakiyesi güncellemesi
 - Gider, bağış ve alınan borç/borç ödemesi kayıtları ile kâr-zarar özeti
 - Panelde "en çok satış yapılan" ve "en yüksek alacaklı" müşteri listeleri
 - Her Pazartesi 08.00'de alacaklı müşterilere e-posta ve SMS hatırlatması
@@ -22,7 +22,9 @@ PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulamas
 
 Varsayılan dosya modu verileri tek bir SQLite dosyasında tutar; MySQL/MariaDB sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır. Mevcut SQLite dosyaları uygulama açıldığında otomatik ve işlem içinde güncellenir; eski kayıtlar korunur.
 
-Güncellemeden önce veri dosyanızı yedekleyin. Eski satışların kitap maliyeti, yükseltme sırasında mevcut kitap alış fiyatıyla yaklaşık olarak doldurulur. Eski teslim alan, teslim yeri, yayınevi ve sınıf seviyesi verileri dosyada korunur, ancak yeni arayüzde kullanılmaz. Kâr/zarar; net satış, satış anındaki kitap maliyeti, gider ve bağışlardan hesaplanır. Alınan borç ve anapara geri ödemeleri kâr/zarardan ayrı izlenir.
+Güncellemeden önce veri dosyanızı yedekleyin. Eski koli sütunları ve verileri yükseltme sırasında silinir. Eski satışların kitap maliyeti, yükseltme sırasında mevcut kitap alış fiyatıyla yaklaşık olarak doldurulur. Eski teslim alan, teslim yeri, yayınevi ve sınıf seviyesi verileri dosyada korunur, ancak yeni arayüzde kullanılmaz. Kâr/zarar; net satış, satış anındaki kitap maliyeti, gider ve bağışlardan hesaplanır. Alınan borç ve anapara geri ödemeleri kâr/zarardan ayrı izlenir.
+
+Mevcut stok hareketlerindeki kişi adları geçişte kişi listesine aktarılır. Sonraki kişi adı değişiklikleri geçmiş hareketleri değiştirmez. Liste araması yalnızca ekranda yüklenmiş kayıtları filtreler; arama sırasında genel toplam satırı gizlenir.
 
 1. Örnek veriler ve `admin / admin123` hesabıyla yerel dosyayı hazırlayın:
 
@@ -44,7 +46,7 @@ Bu modda gerçek e-posta/SMS gönderimi özellikle devre dışıdır; `cron_noti
 
 ## Gereksinimler
 
-- PHP 8.1 veya üzeri; MySQL modu için `pdo_mysql`, yerel dosya modu için `pdo_sqlite`; dışa aktarım ve entegrasyonlara göre `mbstring`, `zip`, `curl` ve OpenSSL eklentileri
+- PHP 8.1 veya üzeri; MySQL modu için `pdo_mysql`, yerel dosya modu için `pdo_sqlite` ve SQLite 3.35 veya üzeri; dışa aktarım ve entegrasyonlara göre `mbstring`, `zip`, `curl` ve OpenSSL eklentileri
 - Üretim MySQL modu için MySQL 8+ veya MariaDB 10.4+ (yerel deneme modunda MySQL gerekmez)
 - Google Sheets entegrasyonu için Google Cloud servis hesabı ve Sheets API erişimi (isteğe bağlı)
 
@@ -79,7 +81,7 @@ Bu modda gerçek e-posta/SMS gönderimi özellikle devre dışıdır; `cron_noti
 
    Tarayıcıda `http://127.0.0.1:8000` adresini açın. Üretim ortamında PHP destekli Apache veya başka bir web sunucusu kullanın; uygulamayı HTTPS üzerinden sunun ve proje içindeki `sql/`, `config.php`, `lib.php`, `install.php`, `cron_sync.php` ile servis hesabı anahtar dosyasına web üzerinden erişimi engelleyin. Kurulumdan sonra `install.php` dosyasını web erişimine açık bırakmayın.
 
-   Mevcut MySQL/MariaDB kurulumlarını güncellerken önce yedek alın, sonra `mysql -u kitapcari_app -p kitapcari < sql/schema.sql` çalıştırın. Bu işlem eski teslim alan, teslim yeri, yayınevi ve sınıf seviyesi sütunlarını kaldırır.
+   Mevcut MySQL/MariaDB kurulumlarını güncellerken önce yedek alın, sonra `mysql -u kitapcari_app -p kitapcari < sql/schema.sql` çalıştırın. Bu işlem eski koli, teslim alan, teslim yeri, yayınevi ve sınıf seviyesi sütunlarını kaldırır.
 
 ## Google Sheets
 
@@ -116,8 +118,8 @@ Mevcut kurulumda yeni tabloları oluşturmak için `php install.php` komutunu me
 
 ## Veri ve hesaplama notları
 
-- Güncel stok = stok girişleri − satışlar − stok çıkışları (teslimat). Yetersiz stokta çıkış ve satış reddedilir.
-- Satışta fiyat boş bırakılırsa kitap kartındaki satış fiyatı kullanılır. Koli miktarı girilirse adet, kitap kartındaki koli adedinden hesaplanır.
+- Güncel stok = stok girişleri + satış ve stok çıkışı iadeleri − satışlar − stok çıkışları − tedarikçi iadeleri. Satış dışı çıkış iadeleri cari bakiyeyi ve kâr/zararı değiştirmez. Yetersiz stokta çıkış ve satış reddedilir.
+- Satışta fiyat boş bırakılırsa kitap kartındaki satış fiyatı kullanılır.
 - Tahsilatlar, müşteri bazında en eski satışlardan başlayarak FIFO yöntemiyle mahsup edilir. Bu nedenle vadesi geçmiş raporu tahsilatı belirli bir faturaya elle bağlamaz.
 - Tutar girişlerinde `1234,50` veya `1234.50` kullanılabilir.
 

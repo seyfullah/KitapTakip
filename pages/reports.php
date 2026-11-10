@@ -6,9 +6,9 @@ $f = ['from' => get('from'), 'to' => get('to'), 'customer_id' => get('customer_i
 if (get('xlsx')) xlsx_download("rapor_$key.xlsx", [$defs[$key] => [$head, $data]]);
 
 $moneyCols = [
-    'kitap' => [4], 'okul' => [5], 'kirtasiye' => [5], 'ilce' => [3], 'musteri_detay' => [3, 4, 5], 'cari' => [4, 5, 6], 'stok' => [9], 'vadesi' => [6], 'vade_musteri' => [4], 'pivot' => [],
+    'kitap' => [3], 'okul' => [4], 'kirtasiye' => [4], 'ilce' => [3], 'musteri_detay' => [3, 4, 5], 'cari' => [4, 5, 6], 'stok' => [8], 'vadesi' => [6], 'vade_musteri' => [4], 'pivot' => [],
 ][$key];
-$intCols = ['kitap' => [2], 'okul' => [3], 'kirtasiye' => [3], 'ilce' => [2], 'musteri_detay' => [2], 'stok' => [2, 3, 4, 5, 6, 7], 'pivot' => range(1, count($head) - 1)][$key] ?? [];
+$intCols = ['kitap' => [2], 'okul' => [3], 'kirtasiye' => [3], 'ilce' => [2], 'musteri_detay' => [2], 'stok' => [2, 3, 4, 5, 6], 'pivot' => range(1, count($head) - 1)][$key] ?? [];
 $totCols = array_merge($moneyCols, in_array($key, ['pivot', 'stok'], true) ? $intCols : array_slice($intCols, 0, 1));
 
 layout_head($defs[$key], 'reports');

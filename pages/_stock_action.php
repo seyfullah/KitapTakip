@@ -19,20 +19,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
     } elseif ($act === 'in' || $act === 'out') {
         $bid = (int) post('book_id');
-        $book = row('SELECT koli_adedi FROM books WHERE id = ?', [$bid]);
+        $book = row('SELECT id FROM books WHERE id = ?', [$bid]);
         try {
             if (!$book) throw new DomainException('Kitap seçiniz.');
-            [$adet, $koli] = stock_quantity(post('adet'), post('koli'), post('miktar_tipi'), $book);
+            $adet = stock_quantity(post('adet'));
+            $person = row('SELECT ad FROM people WHERE id = ?', [(int) post('person_id')]);
+            if (!$person) throw new DomainException('Listeden bir kişi seçiniz.');
 
             if ($act === 'in') {
-                if (post('teslim_alan') === '') throw new DomainException('Teslim alan kişi zorunludur.');
                 q('INSERT INTO stock_in (book_id, tarih, adet, teslim_alan, aciklama) VALUES (?,?,?,?,?)',
-                    [$bid, post('tarih', date('Y-m-d')), $adet, post('teslim_alan'), post('aciklama')]);
+                    [$bid, post('tarih', date('Y-m-d')), $adet, $person['ad'], post('aciklama')]);
                 flash("Stok girişi yapıldı ($adet adet).");
                 after_write();
             } else {
                 $cid = (int) post('customer_id');
-                if (!$cid || post('goturen_kisi') === '') throw new DomainException('Müşteri ve götüren kişi zorunludur.');
+                if (!$cid) throw new DomainException('Müşteri zorunludur.');
                 $pdo = db();
                 $pdo->beginTransaction();
                 try {
@@ -40,7 +41,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     if (!row('SELECT id FROM books WHERE id = ?' . $lock, [$bid])) throw new DomainException('Kitap bulunamadı.');
                     $available = book_stock($bid);
                     if ($adet > $available) throw new DomainException("Stok yetersiz (mevcut: $available adet).");
-                    insert_stock_out($bid, $cid, post('tarih', date('Y-m-d')), $adet, $koli, post('goturen_kisi'), post('aciklama'));
+                    insert_stock_out($bid, $cid, post('tarih', date('Y-m-d')), $adet, $person['ad'], post('aciklama'));
                     $pdo->commit();
                     flash("Stok çıkışı kaydedildi ($adet adet).");
                     after_write();

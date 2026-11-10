@@ -20,7 +20,7 @@ layout_head('Gider Kaydı', 'expenses'); ?>
   <input type="hidden" name="_csrf" value="<?= csrf() ?>">
   <label>Tarih<input type="date" name="tarih" value="<?= date('Y-m-d') ?>" required></label>
   <label>Kategori<input name="kategori" list="expense-categories" required></label>
-  <datalist id="expense-categories"><?php foreach (['Kira', 'Ulaşım', 'Maaş', 'Fatura', 'Kırtasiye', 'Bakım', 'Diğer'] as $category) echo '<option value="' . h($category) . '">'; ?></datalist>
+  <datalist id="expense-categories"><?php foreach (['Kira', 'Ulaşım', 'Maaş', 'Fatura', 'Kırtasiye', 'Bakım', 'Yarışmacı hediyesi', 'Görevli hediyesi', 'Diğer'] as $category) echo '<option value="' . h($category) . '">'; ?></datalist>
   <label>Tutar (TL)<input name="tutar" inputmode="decimal" required></label>
   <label>Yöntem<?= select('yontem', array_combine(['Nakit', 'Havale/EFT', 'Kart', 'Diğer'], ['Nakit', 'Havale/EFT', 'Kart', 'Diğer'])) ?></label>
   <label>Açıklama<input name="aciklama"></label>
