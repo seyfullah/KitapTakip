@@ -6,6 +6,7 @@ mb_internal_encoding('UTF-8');
 date_default_timezone_set('Europe/Istanbul');
 
 $p = get('p', 'dashboard');
+if ($p === 'stock') redirect('?p=stock_current');
 
 if ($p === 'logout') { session_destroy(); redirect('?p=login'); }
 
@@ -30,6 +31,6 @@ if ($p === 'login') {
 if (empty($_SESSION['uid'])) redirect('?p=login');
 csrf_check();
 
-$pages = ['dashboard', 'books', 'stock', 'customers', 'sales', 'payments', 'cari', 'overdue', 'notifications', 'reports', 'export'];
+$pages = ['dashboard', 'books', 'stock_in', 'stock_out', 'stock_current', 'stock_in_history', 'stock_out_history', 'customers', 'sales', 'returns_customer', 'returns_supplier', 'payments', 'cari', 'overdue', 'expenses', 'donations', 'loans', 'finance', 'notifications', 'reports', 'export'];
 if (!in_array($p, $pages, true)) { http_response_code(404); $p = 'dashboard'; }
 require __DIR__ . '/pages/' . $p . '.php';

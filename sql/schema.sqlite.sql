@@ -10,21 +10,19 @@ CREATE TABLE IF NOT EXISTS books (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kod TEXT NOT NULL UNIQUE,
   ad TEXT NOT NULL,
-  yayinevi TEXT NOT NULL DEFAULT '',
-  sinif TEXT NOT NULL DEFAULT '',
   alis_fiyati NUMERIC NOT NULL DEFAULT 0,
   satis_fiyati NUMERIC NOT NULL DEFAULT 0,
   koli_adedi INTEGER NOT NULL DEFAULT 1,
   kritik_stok INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS books_ad ON books(ad);
-CREATE INDEX IF NOT EXISTS books_yayinevi ON books(yayinevi);
 
 CREATE TABLE IF NOT EXISTS stock_in (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id INTEGER NOT NULL REFERENCES books(id),
   tarih TEXT NOT NULL,
   adet INTEGER NOT NULL,
+  teslim_alan TEXT NOT NULL,
   aciklama TEXT NOT NULL DEFAULT ''
 );
 
@@ -49,8 +47,7 @@ CREATE TABLE IF NOT EXISTS stock_out (
   tarih TEXT NOT NULL,
   adet INTEGER NOT NULL,
   koli NUMERIC NOT NULL DEFAULT 0,
-  alan_kisi TEXT NOT NULL,
-  teslim_yeri TEXT NOT NULL,
+  goturen_kisi TEXT NOT NULL,
   aciklama TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS stock_out_tarih ON stock_out(tarih);
@@ -73,8 +70,35 @@ CREATE TABLE IF NOT EXISTS sale_items (
   adet INTEGER NOT NULL,
   koli NUMERIC NOT NULL DEFAULT 0,
   birim_fiyat NUMERIC NOT NULL,
+  maliyet_birim NUMERIC NOT NULL DEFAULT 0,
   toplam NUMERIC NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS customer_returns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
+  tarih TEXT NOT NULL,
+  adet INTEGER NOT NULL,
+  koli NUMERIC NOT NULL DEFAULT 0,
+  birim_fiyat NUMERIC NOT NULL,
+  maliyet_birim NUMERIC NOT NULL DEFAULT 0,
+  toplam NUMERIC NOT NULL,
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS customer_returns_tarih ON customer_returns(tarih);
+
+CREATE TABLE IF NOT EXISTS supplier_returns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id INTEGER NOT NULL REFERENCES books(id),
+  tarih TEXT NOT NULL,
+  tedarikci TEXT NOT NULL,
+  adet INTEGER NOT NULL,
+  koli NUMERIC NOT NULL DEFAULT 0,
+  birim_fiyat NUMERIC NOT NULL,
+  toplam NUMERIC NOT NULL,
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS supplier_returns_tarih ON supplier_returns(tarih);
 
 CREATE TABLE IF NOT EXISTS payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,6 +109,45 @@ CREATE TABLE IF NOT EXISTS payments (
   aciklama TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS payments_tarih ON payments(tarih);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tarih TEXT NOT NULL,
+  kategori TEXT NOT NULL,
+  tutar NUMERIC NOT NULL,
+  yontem TEXT NOT NULL DEFAULT 'Nakit',
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS expenses_tarih ON expenses(tarih);
+
+CREATE TABLE IF NOT EXISTS donations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tarih TEXT NOT NULL,
+  bagisci TEXT NOT NULL DEFAULT '',
+  tutar NUMERIC NOT NULL,
+  yontem TEXT NOT NULL DEFAULT 'Nakit',
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS donations_tarih ON donations(tarih);
+
+CREATE TABLE IF NOT EXISTS loans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tarih TEXT NOT NULL,
+  alacakli TEXT NOT NULL,
+  tutar NUMERIC NOT NULL,
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS loans_tarih ON loans(tarih);
+
+CREATE TABLE IF NOT EXISTS loan_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  loan_id INTEGER NOT NULL REFERENCES loans(id) ON DELETE CASCADE,
+  tarih TEXT NOT NULL,
+  tutar NUMERIC NOT NULL,
+  yontem TEXT NOT NULL DEFAULT 'Nakit',
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS loan_payments_tarih ON loan_payments(tarih);
 
 CREATE TABLE IF NOT EXISTS notification_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

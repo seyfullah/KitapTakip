@@ -10,6 +10,40 @@
   const collator = new Intl.Collator('tr', {numeric: true, sensitivity: 'base'});
 
   document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-stock-quantity]').forEach(form => {
+      const units = form.querySelector('[data-stock-units]');
+      const cartons = form.querySelector('[data-stock-cartons]');
+      const mode = form.querySelector('[name="miktar_tipi"]');
+      const book = form.querySelector('[data-carton-book]');
+      const label = form.querySelector('[data-carton-label]');
+      const cartonSize = () => Number(book.selectedOptions[0]?.dataset.cartonSize || 0);
+      const syncCartonLabel = () => {
+        label.textContent = cartonSize() || '—';
+        if (mode.value === 'koli') units.value = Math.round((Number(cartons.value) || 0) * cartonSize()) || '';
+      };
+
+      units.addEventListener('input', () => {
+        if (units.value) {
+          cartons.value = '';
+          units.readOnly = false;
+          mode.value = 'adet';
+        } else mode.value = '';
+      });
+      cartons.addEventListener('input', () => {
+        if (cartons.value) {
+          units.value = Math.round((Number(cartons.value) || 0) * cartonSize()) || '';
+          units.readOnly = true;
+          mode.value = 'koli';
+        } else {
+          units.value = '';
+          units.readOnly = false;
+          mode.value = '';
+        }
+      });
+      book.addEventListener('change', syncCartonLabel);
+      syncCartonLabel();
+    });
+
     document.querySelectorAll('table.sortable-table').forEach(table => {
       const body = table.tBodies[0];
       table.querySelectorAll('thead .sort-button').forEach((btn, col) => {

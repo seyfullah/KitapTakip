@@ -4,7 +4,7 @@ PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve car
 
 ## Özellikler
 
-- Kitap kartları, stok girişleri, koli hesabı, otomatik satış stok düşümü ve kritik stok uyarıları
+- Kitap kartları, ayrı stok giriş/çıkış/hareket/güncel stok sayfaları, koli hesabı, otomatik satış stok düşümü ve kritik stok uyarıları
 - Okul ve kırtasiye müşteri kartları; il, ilçe ve iletişim bilgileri
 - Vadeli satış, satış kalemleri, tahsilat ve müşteri ekstresi
 - FIFO tahsilat mahsuplaştırmasıyla gecikmiş alacak takibi
@@ -12,13 +12,17 @@ PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve car
 - Yazdırılabilir ekstre ve çok sekmeli Excel (`.xlsx`) dışa aktarımı
 - Google Sheets'e elle veya cron ile veri aktarımı
 - Mobil uyumlu modern arayüz; tüm listelerde sütun başlığına tıklayarak sıralama
-- Teslim alan kişi ve teslim yeri kaydıyla stok çıkışı (müşteriye teslimat)
+- Stok girişinde teslim alan, stok çıkışında götüren kişi kaydı
+- Müşteri ve tedarikçi iadeleri; stok ve müşteri bakiyesi güncellemesi
+- Gider, bağış ve alınan borç/borç ödemesi kayıtları ile kâr-zarar özeti
 - Panelde "en çok satış yapılan" ve "en yüksek alacaklı" müşteri listeleri
 - Her Pazartesi 08.00'de alacaklı müşterilere e-posta ve SMS hatırlatması
 
 ## Hızlı deneme (MySQL ve e-posta olmadan)
 
 Yerel deneme modu verileri tek bir dosya tabanlı SQLite veritabanında tutar; MySQL sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır.
+
+Mevcut kurulumu güncellerken, uygulama dosyalarını aldıktan sonra veritabanı şemasını bir kez `php migrate.php` komutuyla güncelleyin. Bu işlem eski teslim yeri, yayınevi ve sınıf seviyesi sütunlarını ve içlerindeki verileri kaldırır; eski satışların kitap maliyetini mevcut kitap alış fiyatıyla yaklaşık olarak doldurur. Kâr/zarar; net satış, satış anındaki kitap maliyeti, gider ve bağışlardan hesaplanır. Alınan borç ve anapara geri ödemeleri kâr/zarardan ayrı izlenir.
 
 1. Örnek veriler ve `admin / admin123` hesabıyla yerel dosyayı hazırlayın:
 
