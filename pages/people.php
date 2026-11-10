@@ -2,8 +2,12 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) post('id');
     if (post('act') === 'delete') {
-        q('DELETE FROM people WHERE id = ?', [$id]);
-        flash('Kişi listeden silindi; geçmiş hareketlerdeki adı korundu.');
+        if ((int) val('SELECT COUNT(*) FROM user_people WHERE person_id = ?', [$id])) {
+            flash('Bir kullanıcı hesabıyla eşleşen kişi silinemez.');
+        } else {
+            q('DELETE FROM people WHERE id = ?', [$id]);
+            flash('Kişi listeden silindi; geçmiş hareketlerdeki adı korundu.');
+        }
     } else {
         $name = post('ad');
         if ($name === '' || mb_strlen($name) > 120) {

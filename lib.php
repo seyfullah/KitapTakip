@@ -4,7 +4,7 @@ declare(strict_types=1);
 function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; return $c[$k] ?? null; }
 
 function sqlite_upgrade(PDO $pdo): void {
-    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 5) return;
+    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 6) return;
 
     $pdo->exec('BEGIN IMMEDIATE');
     try {
@@ -62,6 +62,10 @@ function sqlite_upgrade(PDO $pdo): void {
             $pdo->exec('INSERT OR IGNORE INTO legacy_sale_returns (sale_item_id, adet) SELECT sale_item_id, SUM(adet) FROM customer_returns GROUP BY sale_item_id');
             $pdo->exec('PRAGMA user_version = 5');
         }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 6) {
+            $pdo->exec('CREATE TABLE IF NOT EXISTS user_people (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, person_id INTEGER NOT NULL REFERENCES people(id))');
+            $pdo->exec('PRAGMA user_version = 6');
+        }
         $pdo->exec('COMMIT');
     } catch (Throwable $e) {
         $pdo->exec('ROLLBACK');
@@ -115,6 +119,53 @@ function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql);
 function rows(string $sql, array $p = []): array { return q($sql, $p)->fetchAll(); }
 function row(string $sql, array $p = []): ?array { return q($sql, $p)->fetch() ?: null; }
 function val(string $sql, array $p = []) { $r = q($sql, $p)->fetch(PDO::FETCH_NUM); return $r ? $r[0] : null; }
+
+function current_person_id(): ?int {
+    $person = val('SELECT person_id FROM user_people WHERE user_id = ?', [(int) ($_SESSION['uid'] ?? 0)]);
+    return $person === null ? null : (int) $person;
+}
+
+function require_current_person(string $returnPage, int $saleId = 0): int {
+    $personId = current_person_id();
+    if ($personId !== null) return $personId;
+    flash('Devam etmek için hesabınızı kişi listesindeki kaydınızla eşleştirin.');
+    $params = ['p' => 'account', 'return' => $returnPage];
+    if ($saleId > 0) $params['sale_id'] = $saleId;
+    redirect('?' . http_build_query($params));
+}
+
+function deliver_sale(int $saleId, string $date, string $carrier, string $recipient): int {
+    $pdo = db();
+    $sqlite = cfg('app_storage') === 'sqlite';
+    if ($sqlite) $pdo->exec('BEGIN IMMEDIATE');
+    else $pdo->beginTransaction();
+    try {
+        $lock = cfg('app_storage') === 'sqlite' ? '' : ' FOR UPDATE';
+        $sale = row('SELECT id, tarih FROM sales WHERE id = ?' . $lock, [$saleId]);
+        if (!$sale) throw new DomainException('Satış bulunamadı.');
+        if ($date < $sale['tarih']) throw new DomainException('Teslim tarihi satış tarihinden önce olamaz.');
+        $items = rows('SELECT id, adet FROM sale_items WHERE sale_id = ? ORDER BY id' . $lock, [$saleId]);
+        $total = 0;
+        foreach ($items as $item) {
+            $legacy = (int) val('SELECT COALESCE(SUM(adet),0) FROM legacy_sale_returns WHERE sale_item_id = ?', [$item['id']]);
+            $delivered = (int) val('SELECT COALESCE(SUM(adet),0) FROM sale_deliveries WHERE sale_item_id = ?', [$item['id']]);
+            $remaining = (int) $item['adet'] - $legacy - $delivered;
+            if ($remaining < 0) throw new DomainException('Satış kalemindeki teslimat bilgileri tutarsız.');
+            if ($remaining === 0) continue;
+            q('INSERT INTO sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)',
+                [$item['id'], $date, $remaining, $carrier, $recipient]);
+            $total += $remaining;
+        }
+        if ($total === 0) throw new DomainException('Bu satışın teslimat bekleyen kalemi yok.');
+        if ($sqlite) $pdo->exec('COMMIT');
+        else $pdo->commit();
+        return $total;
+    } catch (Throwable $e) {
+        if ($sqlite) $pdo->exec('ROLLBACK');
+        else $pdo->rollBack();
+        throw $e;
+    }
+}
 
 function insert_stock_out(int $bookId, int $customerId, string $date, int $units, string $carrier, string $description): void {
     $fields = ['book_id', 'customer_id', 'tarih', 'adet', 'goturen_kisi', 'aciklama'];
@@ -736,13 +787,13 @@ function send_weekly_reminders(): array {
 
 function layout_head(string $title, string $page): void {
     $groups = [
-        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler'],
+        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler', 'account' => 'Hesabım'],
         'Stok' => ['stock_in' => 'Stok Girişi', 'stock_out' => 'Teslimat Bekleyen Satışlar',
             'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri'],
         'Satış ve İade' => ['sales' => 'Satışlar', 'returns_customer' => 'Müşteri İadesi',
             'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi'],
         'Müşteriler' => ['customers' => 'Müşteri Kartları', 'payments' => 'Tahsilat', 'cari' => 'Cari / Ekstre', 'overdue' => 'Vadeli Alacak'],
-        'Finans' => ['expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'finance' => 'Kâr / Zarar'],
+        'Finans' => ['donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'expenses' => 'Giderler', 'finance' => 'Kâr / Zarar'],
         'Diğer' => ['notifications' => 'Bildirimler', 'reports' => 'Raporlar', 'export' => 'Excel / Sheets'],
     ];
     echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><b class="brand">📚 Kitap Cari</b><div class="nav-groups">';

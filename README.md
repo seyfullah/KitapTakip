@@ -14,7 +14,8 @@ PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulamas
 - Mobil uyumlu modern arayüz; listelerde arama ve sütun başlığına tıklayarak sıralama
 - Üst menüde tanımlar, stok, satış ve iade, müşteriler, finans ve diğer işlemler için alt menüler
 - Yönetilebilir ortak kişi listesi; stok girişinde teslim alan ve satış teslimatında götüren kişi seçimi
-- Teslimat bekleyen satışlar ve sipariş içeriği; satış kalemleri için kısmi teslimat, teslim tarihi ve teslim alan kaydı
+- **Tanımlar → Hesabım** ekranında kullanıcı-kişi eşleştirmesi; işlem formlarında ilgili kişinin varsayılan seçimi
+- Teslimat bekleyen satışlar ve sipariş içeriği; tüm bekleyen kalemler için teslim tarihi ve teslim alan kaydı
 - Satış, stok çıkışı ve tedarikçi iadeleri; stok ve ilgili müşteri bakiyesi güncellemesi
 - Gider, bağış ve alınan borç/borç ödemesi kayıtları ile kâr-zarar özeti
 - Stok girişine bağlı alış tutarı, vade, tedarikçi ödemeleri ve iade fazlası alacak takibi
@@ -34,6 +35,8 @@ Mevcut stok hareketlerindeki kişi adları geçişte kişi listesine aktarılır
    ```sh
    php install.php --sqlite --demo
    ```
+
+   Demo kurulumu yalnızca yeni bir SQLite dosyasında veya boş bir MySQL/MariaDB veritabanında çalışır; mevcut veritabanına örnek veri eklemez. Uygulama tablolarındaki örnek hareketler hayalidir ve bildirim göndermez. Demo dışındaki ek örnek kullanıcı hesaplarının parolaları rastgele oluşturulur ve giriş için paylaşılmaz.
 
    Varsayılan dosya proje klasörünün dışında `../kitaptakip-data/kitaptakip.sqlite` konumuna yazılır. Yerini değiştirmek için `APP_DATA_FILE=/tam/yol/kitaptakip.sqlite` ayarlayın (kurulumda ve sunucuyu başlatırken aynı ayarı kullanın). Dosya izinleri nedeniyle kurulum ve web sunucusu aynı kullanıcıyla çalışmalıdır.
 
@@ -122,7 +125,7 @@ Mevcut kurulumda yeni tabloları oluşturmak için `php install.php` komutunu me
 ## Veri ve hesaplama notları
 
 - Güncel stok = stok girişleri + satış ve stok çıkışı iadeleri − satışlar − stok çıkışları − tedarikçi iadeleri. Satış dışı çıkış iadeleri cari bakiyeyi ve kâr/zararı değiştirmez. Yetersiz stokta çıkış ve satış reddedilir.
-- Satış kaydı stoğu ayırır; sonradan kaydedilen kısmi teslimatlar stoğu ikinci kez azaltmaz. Teslimat takibi öncesindeki satışlar teslim edilmemiş kabul edilir, eski satış iadeleri teslim edilebilir miktardan düşülür. Yeni satış iadeleri yalnızca teslim edilmiş adetler için kaydedilir. Önceden kaydedilmiş bağımsız stok çıkışları ve iadeleri ayrıca korunur.
+- Satış kaydı stoğu ayırır; teslimat kaydı kalan tüm kalemleri teslim eder ve stoğu ikinci kez azaltmaz. Önceki kısmi teslimatlar korunur. Teslimat takibi öncesindeki satışlar teslim edilmemiş kabul edilir, eski satış iadeleri teslim edilebilir miktardan düşülür. Yeni satış iadeleri yalnızca teslim edilmiş adetler için kaydedilir. Önceden kaydedilmiş bağımsız stok çıkışları ve iadeleri ayrıca korunur.
 - Her yeni stok girişinde toplam alış tutarı ve vade girilir. Önceki girişler için bu bilgiler **Finans → Tedarikçi Ödemeleri** ekranından eklenebilir. Eski tedarikçi iadeleri ve ödemeleri girişlerle otomatik eşleştirilmez; yeni iadeler seçilen girişin toplam alış tutarı üzerinden orantılı hesaplanır. Önceden yapılmış iadeler yeni iade miktarı kontrolünde yer almaz; eski kayıtları kontrol edin.
 - Tedarikçi ödemeleri ve alınan borçların anapara ödemeleri kâr/zararı doğrudan değiştirmez. İade, ilgili alışın borcundan düşülür; ödenmiş tutarı aşan iade tedarikçiden alacak olarak gösterilir.
 - Satışta fiyat boş bırakılırsa kitap kartındaki satış fiyatı kullanılır.

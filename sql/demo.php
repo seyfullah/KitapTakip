@@ -1,24 +1,72 @@
 <?php
-// Demo veri: php install.php admin admin123 --demo
-if ((int) val('SELECT COUNT(*) FROM customers') > 0) {
-    echo "Demo verisi zaten var; mevcut kayıtlar korunuyor.\n";
-    return;
+// Demo veri yalnızca boş bir uygulama veritabanına eklenir.
+$demoTables = ['people', 'user_people', 'books', 'customers', 'stock_in', 'supplier_purchases', 'supplier_payments',
+    'stock_out', 'stock_out_returns', 'sales', 'sale_items', 'sale_deliveries', 'legacy_sale_returns',
+    'customer_returns', 'supplier_returns', 'supplier_return_links', 'payments', 'expenses', 'donations',
+    'loans', 'loan_payments', 'notification_log'];
+foreach ($demoTables as $table) {
+    if ((int) val("SELECT COUNT(*) FROM $table") > 0) {
+        echo "Veritabanında kayıt var; örnek veriler eklenmedi.\n";
+        return;
+    }
 }
-$today = date('Y-m-d');
-$bk = [['MAT5', 'Matematik 5', 90, 150, 100], ['TRK6', 'Türkçe 6', 95, 170, 80], ['FEN7', 'Fen Bilimleri 7', 100, 180, 60]];
-$ignore = cfg('app_storage') === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
-q("$ignore INTO people (ad) VALUES (?)", ['Demo kullanıcısı']);
-foreach ($bk as $b) q("$ignore INTO books (kod, ad, alis_fiyati, satis_fiyati, kritik_stok) VALUES (?,?,?,?,?)", $b);
-$cs = [['Okul', 'Özel Başarı Okulu', 'Ankara', 'Çankaya'], ['Okul', 'Atatürk İlkokulu', 'Ankara', 'Keçiören'], ['Kırtasiye', 'Güneş Kırtasiye', 'İzmir', 'Karşıyaka']];
-foreach ($cs as $c) q('INSERT INTO customers (tip, ad, il, ilce, telefon) VALUES (?,?,?,?,?)', [...$c, '0555 000 00 00']);
-foreach (rows('SELECT id FROM books') as $b) q('INSERT INTO stock_in (book_id, tarih, adet, teslim_alan, aciklama) VALUES (?,?,?,?,?)', [$b['id'], date('Y-m-d', strtotime('-90 days')), 1000, 'Demo kullanıcısı', 'Açılış']);
-$mk = function (string $cust, string $kod, int $adet, int $ago, int $vadeGun) {
-    $c = (int) val('SELECT id FROM customers WHERE ad = ?', [$cust]); $b = row('SELECT * FROM books WHERE kod = ?', [$kod]);
-    $t = date('Y-m-d', strtotime("-$ago days")); $tot = $adet * $b['satis_fiyati'];
-    q('INSERT INTO sales (customer_id, tarih, vade_tarihi, toplam) VALUES (?,?,?,?)', [$c, $t, date('Y-m-d', strtotime("$t +$vadeGun days")), $tot]);
-    q('INSERT INTO sale_items (sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?)', [db()->lastInsertId(), $b['id'], $adet, $b['satis_fiyati'], $b['alis_fiyati'], $tot]);
-};
-$mk('Özel Başarı Okulu', 'MAT5', 250, 60, 30); $mk('Özel Başarı Okulu', 'TRK6', 150, 20, 30);
-$mk('Atatürk İlkokulu', 'FEN7', 100, 45, 30); $mk('Güneş Kırtasiye', 'MAT5', 80, 10, 45);
-q('INSERT INTO payments (customer_id, tarih, tutar, yontem) VALUES (?,?,?,?)', [(int) val('SELECT id FROM customers WHERE ad = ?', ['Özel Başarı Okulu']), $today, 30000, 'Havale/EFT']);
-echo "Demo veri yüklendi.\n";
+$pdo = db();
+$pdo->beginTransaction();
+try {
+    $ago = static fn(int $days): string => date('Y-m-d', strtotime("-$days days"));
+    $people = ['Demo kullanıcısı', 'Ayşe Örnek', 'Mehmet Örnek'];
+    $personIds = [];
+    foreach ($people as $person) {
+        q('INSERT INTO people (ad) VALUES (?)', [$person]);
+        $personIds[] = (int) $pdo->lastInsertId();
+    }
+    $users = rows('SELECT id FROM users WHERE kullanici = ?', [$u]);
+    $userId = (int) $users[0]['id'];
+    q('INSERT INTO user_people (user_id, person_id) VALUES (?,?)', [$userId, $personIds[0]]);
+    for ($i = 1; $i < 3; $i++) {
+        $username = 'demo_' . bin2hex(random_bytes(8));
+        q('INSERT INTO users (kullanici, sifre_hash) VALUES (?,?)', [$username, password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT)]);
+        q('INSERT INTO user_people (user_id, person_id) VALUES (?,?)', [(int) $pdo->lastInsertId(), $personIds[$i]]);
+    }
+    $bookIds = [];
+    foreach ([['MAT5', 'Matematik 5', 90, 150, 100], ['TRK6', 'Türkçe 6', 95, 170, 80], ['FEN7', 'Fen Bilimleri 7', 100, 180, 60]] as $book) {
+        q('INSERT INTO books (kod, ad, alis_fiyati, satis_fiyati, kritik_stok) VALUES (?,?,?,?,?)', $book);
+        $bookIds[] = (int) $pdo->lastInsertId();
+    }
+    $customerIds = [];
+    foreach ([['Okul', 'Özel Başarı Okulu', 'Ankara', 'Çankaya'], ['Okul', 'Atatürk İlkokulu', 'Ankara', 'Keçiören'], ['Kırtasiye', 'Güneş Kırtasiye', 'İzmir', 'Karşıyaka']] as $customer) {
+        q('INSERT INTO customers (tip, ad, il, ilce) VALUES (?,?,?,?)', $customer);
+        $customerIds[] = (int) $pdo->lastInsertId();
+    }
+    foreach ($bookIds as $i => $bookId) {
+        $purchasePrice = [90, 95, 100][$i];
+        $salePrice = [150, 170, 180][$i];
+        q('INSERT INTO stock_in (book_id, tarih, adet, teslim_alan, aciklama) VALUES (?,?,?,?,?)', [$bookId, $ago(90), 1000, $people[$i], 'Demo alış']);
+        $stockId = (int) $pdo->lastInsertId();
+        q('INSERT INTO supplier_purchases (stock_in_id, total_cents, due_date) VALUES (?,?,?)', [$stockId, $purchasePrice * 1000 * 100, $ago(30)]);
+        q('INSERT INTO supplier_payments (stock_in_id, tarih, amount_cents, yontem, aciklama) VALUES (?,?,?,?,?)', [$stockId, $ago(40), 1000000, 'Havale/EFT', 'Demo ödeme']);
+        q('INSERT INTO supplier_returns (book_id, tarih, tedarikci, adet, birim_fiyat, toplam, aciklama) VALUES (?,?,?,?,?,?,?)', [$bookId, $ago(35), '', 2, $purchasePrice, 2 * $purchasePrice, 'Demo iade']);
+        q('INSERT INTO supplier_return_links (return_id, stock_in_id) VALUES (?,?)', [(int) $pdo->lastInsertId(), $stockId]);
+        insert_stock_out($bookId, $customerIds[$i], $ago(60), 10, $people[$i], 'Eski demo çıkış');
+        $outId = (int) $pdo->lastInsertId();
+        q('INSERT INTO stock_out_returns (stock_out_id, tarih, adet, aciklama) VALUES (?,?,?,?)', [$outId, $ago(50), 1, 'Demo iade']);
+        q('INSERT INTO sales (customer_id, tarih, vade_tarihi, toplam) VALUES (?,?,?,?)', [$customerIds[$i], $ago(45), $ago(15), 50 * $salePrice]);
+        $saleId = (int) $pdo->lastInsertId();
+        q('INSERT INTO sale_items (sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?)', [$saleId, $bookId, 50, $salePrice, $purchasePrice, 50 * $salePrice]);
+        $itemId = (int) $pdo->lastInsertId();
+        q('INSERT INTO sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)', [$itemId, $ago(40), 20, $people[$i], 'Demo yetkili']);
+        q('INSERT INTO customer_returns (sale_item_id, tarih, adet, birim_fiyat, maliyet_birim, toplam, aciklama) VALUES (?,?,?,?,?,?,?)', [$itemId, $ago(30), 1, $salePrice, $purchasePrice, $salePrice, 'Demo iade']);
+        q('INSERT INTO legacy_sale_returns (sale_item_id, adet) VALUES (?,?)', [$itemId, 1]);
+        q('INSERT INTO payments (customer_id, tarih, tutar, yontem, aciklama) VALUES (?,?,?,?,?)', [$customerIds[$i], $ago(20), 1000, 'Havale/EFT', 'Demo tahsilat']);
+        q('INSERT INTO expenses (tarih, kategori, tutar, yontem, aciklama) VALUES (?,?,?,?,?)', [$ago(10), ['Yarışmacı hediyesi', 'Görevli hediyesi', 'Ulaşım'][$i], 100 + 50 * $i, 'Nakit', 'Demo gider']);
+        q('INSERT INTO donations (tarih, bagisci, tutar, yontem, aciklama) VALUES (?,?,?,?,?)', [$ago(9), 'Demo bağışçı ' . ($i + 1), 300 + 50 * $i, 'Nakit', 'Demo bağış']);
+        q('INSERT INTO loans (tarih, alacakli, tutar, aciklama) VALUES (?,?,?,?)', [$ago(70), 'Demo alacaklı ' . ($i + 1), 3000, 'Kitap alımı']);
+        q('INSERT INTO loan_payments (loan_id, tarih, tutar, yontem, aciklama) VALUES (?,?,?,?,?)', [(int) $pdo->lastInsertId(), $ago(20), 500, 'Nakit', 'Demo ödeme']);
+        q('INSERT INTO notification_log (customer_id, hafta_baslangici, kanal, durum, hedef, hata) VALUES (?,?,?,?,?,?)', [$customerIds[$i], $ago(100), 'E-posta', 'atlandı', '', 'Demo kaydı; bildirim gönderilmedi.']);
+    }
+    $pdo->commit();
+    echo "Demo veri yüklendi.\n";
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+}

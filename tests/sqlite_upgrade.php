@@ -31,7 +31,7 @@ try {
         if (!$ok) throw new RuntimeException($message);
     };
 
-    $check((int) $pdo->query('PRAGMA user_version')->fetchColumn() === 5, 'Şema sürümü güncellenmedi.');
+    $check((int) $pdo->query('PRAGMA user_version')->fetchColumn() === 6, 'Şema sürümü güncellenmedi.');
     $check(count(stock_report()) === 1 && book_stock(1) === 17, 'Mevcut stok korunmadı.');
     $check((float) val('SELECT maliyet_birim FROM sale_items WHERE id = 1') === 5.0, 'Satış maliyeti doldurulmadı.');
     $old = row('SELECT alan_kisi, teslim_yeri FROM stock_out WHERE id = 1');
@@ -94,7 +94,10 @@ try {
     q('INSERT INTO sale_items (id, sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?,?)', [2, 2, 1, 1, 10, 5, 10]);
     q('INSERT INTO sale_items (id, sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?,?)', [3, 2, 1, 2, 10, 5, 20]);
     q('INSERT INTO sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)', [2, '2025-01-09', 1, 'Görevli', 'Alıcı']);
-    $_SESSION = [];
+    q('INSERT INTO users (id, kullanici, sifre_hash) VALUES (?,?,?)', [1, 'test', 'hash']);
+    $personId = (int) val("SELECT id FROM people WHERE ad = 'Yeni kişi'");
+    q('INSERT INTO user_people (user_id, person_id) VALUES (?,?)', [1, $personId]);
+    $_SESSION = ['uid' => 1];
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_GET = [];
     ob_start();
@@ -106,7 +109,26 @@ try {
     require __DIR__ . '/../pages/stock_out.php';
     $detail = ob_get_clean();
     $check(str_contains($detail, 'Sipariş notu') && str_contains($detail, 'Sipariş İçeriği'), 'Sipariş ayrıntıları gösterilmedi.');
-    $check(str_contains($detail, 'value="3"') && !str_contains($detail, 'value="2">BK'), 'Teslimat seçiminde bekleyen kalemler yanlış.');
+    $check(str_contains($detail, 'value="' . $personId . '" selected'), 'Giriş yapan kişinin seçimi gösterilmedi.');
+    $check(!str_contains($detail, 'name="sale_item_id"') && !str_contains($detail, 'name="adet"'), 'Teslimat formunda kitap veya adet seçimi bulunuyor.');
+    q('INSERT INTO sale_items (id, sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?,?)', [4, 2, 1, 3, 10, 5, 30]);
+    $pdo->exec("CREATE TRIGGER reject_delivery BEFORE INSERT ON sale_deliveries WHEN NEW.sale_item_id = 4 BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+    try {
+        deliver_sale(2, '2025-01-10', 'Görevli', 'Alıcı');
+        throw new RuntimeException('Hatalı teslimat başarılı oldu.');
+    } catch (PDOException $e) {}
+    $check((int) val('SELECT COUNT(*) FROM sale_deliveries WHERE sale_item_id = 3') === 0, 'Başarısız teslimat kısmen kaydedildi.');
+    $pdo->exec('DROP TRIGGER reject_delivery');
+    $stockBefore = book_stock(1);
+    $check(deliver_sale(2, '2025-01-10', 'Görevli', 'Alıcı') === 5, 'Bekleyen tüm kalemler teslim edilmedi.');
+    $check((int) val('SELECT SUM(adet) FROM sale_deliveries WHERE sale_item_id = 2') === 1
+        && (int) val('SELECT SUM(adet) FROM sale_deliveries WHERE sale_item_id = 3') === 2
+        && (int) val('SELECT SUM(adet) FROM sale_deliveries WHERE sale_item_id = 4') === 3, 'Teslimat miktarları yanlış.');
+    $check(book_stock(1) === $stockBefore, 'Teslimat stoğu tekrar değiştirdi.');
+    try {
+        deliver_sale(2, '2025-01-10', 'Görevli', 'Alıcı');
+        throw new RuntimeException('Tekrarlanan teslimat kabul edildi.');
+    } catch (DomainException $e) {}
     echo "SQLite yükseltmesi ve eski veriler doğrulandı.\n";
 } finally {
     unlink($path);

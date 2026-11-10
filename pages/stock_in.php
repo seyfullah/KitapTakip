@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_stock_action.php';
+$currentPersonId = require_current_person('stock_in');
 layout_head('Stok Girişi', 'stock_in');
 $books = rows('SELECT id, kod, ad FROM books ORDER BY ad');
 ?>
@@ -11,7 +12,7 @@ $books = rows('SELECT id, kod, ad FROM books ORDER BY ad');
   <label>Adet<input type="number" name="adet" min="1" step="1" required></label>
   <label>Toplam Alış Tutarı (TL)<input name="alis_tutari" inputmode="decimal" required></label>
   <label>Ödeme Vadesi<input type="date" name="vade_tarihi" value="<?= date('Y-m-d') ?>" required></label>
-  <label>Teslim Alan Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '">' . h($person['ad']) . '</option>'; ?></select></label>
+  <label>Teslim Alan Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
   <a href="?p=people">Kişileri yönet</a>
   <label>Açıklama<input name="aciklama"></label>
   <button>Stok Ekle</button>
