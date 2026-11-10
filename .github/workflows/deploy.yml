@@ -1,0 +1,35 @@
+name: Hosting'e aktar
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: FTPS ile yükle
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          local-dir: ./
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/.vscode/**
+            **/tests/**
+            **/sql/**
+            **/install.php
+            **/config.php
+            **/cron_sync.php
+            **/cron_notify.php
+            **/README.md
+            **/LICENSE
+            **/.gitignore
