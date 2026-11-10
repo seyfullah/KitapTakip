@@ -11,6 +11,10 @@ PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve car
 - Yönetici paneli, grafikler ve filtrelenebilir kitap, müşteri, stok, cari ve vade raporları
 - Yazdırılabilir ekstre ve çok sekmeli Excel (`.xlsx`) dışa aktarımı
 - Google Sheets'e elle veya cron ile veri aktarımı
+- Mobil uyumlu modern arayüz; tüm listelerde sütun başlığına tıklayarak sıralama
+- Teslim alan kişi ve teslim yeri kaydıyla stok çıkışı (müşteriye teslimat)
+- Panelde "en çok satış yapılan" ve "en yüksek alacaklı" müşteri listeleri
+- Her Pazartesi 08.00'de alacaklı müşterilere e-posta ve SMS hatırlatması
 
 ## Gereksinimler
 
@@ -63,9 +67,28 @@ PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve car
 
    Her aktarım, uygulamanın oluşturduğu sekmeleri güncel verilerle yeniler. Kayıt işlemlerinden sonra otomatik aktarım için `GSHEETS_AUTO=1` ayarlayın. Otomatik aktarım hatası, kayıt başarılı olduktan sonra sayfada bildirilir.
 
+## Haftalık alacak bildirimleri (e-posta ve SMS)
+
+Bakiyesi pozitif olan müşterilere her hafta bir kez bildirim gönderilir. E-posta PHP `mail()` ile (sunucuda çalışan bir MTA gerekir), SMS Twilio ile gönderilir. Ortam değişkenleri:
+
+- `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME`
+- `SMS_TWILIO_ACCOUNT_SID`, `SMS_TWILIO_AUTH_TOKEN`, `SMS_TWILIO_FROM`
+- `REMINDER_CONTACT` (mesajda görünecek iletişim bilgisi, isteğe bağlı)
+
+Pazartesi 08.00 için crontab:
+
+```cron
+CRON_TZ=Europe/Istanbul
+0 8 * * 1 /usr/bin/php /uygulama/yolu/cron_notify.php
+```
+
+Aynı hafta başarıyla gönderilen kanal tekrar gönderilmez; başarısız veya iletişim bilgisi eksik kayıtlar sonraki çalıştırmada yeniden denenir. Sonuçlar **Bildirimler** sayfasında listelenir. Müşteri telefonları Türkiye numarası (`05xx...`) veya `+` ile uluslararası biçimde girilmelidir.
+
+Mevcut kurulumda yeni tabloları oluşturmak için `php install.php` komutunu mevcut kullanıcı adıyla yeniden çalıştırın (yönetici şifresi verdiğiniz değerle güncellenir).
+
 ## Veri ve hesaplama notları
 
-- Güncel stok, toplam stok girişinden satış adetleri çıkarılarak hesaplanır; stok girişleri pozitif adet olarak kaydedilir.
+- Güncel stok = stok girişleri − satışlar − stok çıkışları (teslimat). Yetersiz stokta çıkış ve satış reddedilir.
 - Satışta fiyat boş bırakılırsa kitap kartındaki satış fiyatı kullanılır. Koli miktarı girilirse adet, kitap kartındaki koli adedinden hesaplanır.
 - Tahsilatlar, müşteri bazında en eski satışlardan başlayarak FIFO yöntemiyle mahsup edilir. Bu nedenle vadesi geçmiş raporu tahsilatı belirli bir faturaya elle bağlamaz.
 - Tutar girişlerinde `1234,50` veya `1234.50` kullanılabilir.

@@ -12,7 +12,13 @@ $schools = $topOf('Okul'); $shops = $topOf('Kırtasiye');
 $topCust = rows('SELECT c.ad, SUM(s.toplam) tutar FROM sales s JOIN customers c ON c.id = s.customer_id GROUP BY c.id ORDER BY tutar DESC LIMIT 10');
 $ilce = rows('SELECT CONCAT(c.il, " / ", c.ilce) ad, SUM(s.toplam) tutar FROM sales s JOIN customers c ON c.id = s.customer_id GROUP BY c.il, c.ilce ORDER BY tutar DESC LIMIT 12');
 $monthPay = rows('SELECT DATE_FORMAT(tarih, "%Y-%m") ad, SUM(tutar) tutar FROM payments GROUP BY ad ORDER BY ad DESC LIMIT 12');
-$recv = array_filter(customer_balances(), fn($b) => $b['kalan'] > 0);
+$balances = customer_balances();
+$soldUnits = [];
+foreach (rows('SELECT s.customer_id, SUM(si.adet) adet FROM sale_items si JOIN sales s ON s.id = si.sale_id GROUP BY s.customer_id') as $u) $soldUnits[$u['customer_id']] = (int) $u['adet'];
+$customerRanking = array_map(fn($b) => $b + ['adet' => $soldUnits[$b['id']] ?? 0], $balances);
+usort($customerRanking, fn($a, $b) => $b['satis'] <=> $a['satis']);
+$topSalesCustomers = array_slice($customerRanking, 0, 10);
+$recv = array_values(array_filter($balances, fn($b) => $b['kalan'] > 0));
 usort($recv, fn($a, $b) => $b['kalan'] <=> $a['kalan']);
 $recv = array_slice($recv, 0, 10);
 
@@ -34,6 +40,8 @@ echo '</div>';
   <div><h2>En Çok Satan Kitaplar</h2><?php table(['Kitap', 'Adet', 'Tutar'], array_map(fn($r) => [$r['ad'], $r['adet'], $r['tutar']], $topBooks), ['int' => [1], 'money' => [2]]); ?></div>
   <div><h2>En Çok Satış Yapılan Okullar</h2><?php table(['Okul', 'Tutar'], array_map('array_values', $schools), ['money' => [1]]); ?></div>
   <div><h2>En Çok Satış Yapılan Kırtasiyeler</h2><?php table(['Kırtasiye', 'Tutar'], array_map('array_values', $shops), ['money' => [1]]); ?></div>
+  <div><h2>En Çok Satış Yapılan Müşteriler</h2><?php table(['Müşteri', 'Tip', 'Satılan Adet', 'Satış', 'Tahsilat', 'Kalan'], array_map(fn($r) => [$r['ad'], $r['tip'], $r['adet'], $r['satis'], $r['tahsilat'], $r['kalan']], $topSalesCustomers), ['int' => [2], 'money' => [3, 4, 5], 'totals' => [2, 3, 4, 5]]); ?></div>
+  <div><h2>En Yüksek Alacağı Olan Müşteriler</h2><?php table(['Müşteri', 'Tip', 'Kalan Alacak'], array_map(fn($r) => [$r['ad'], $r['tip'], $r['kalan']], $recv), ['money' => [2], 'totals' => [2]]); ?></div>
   <?php if ($crit): ?><div><h2>Kritik Stok Uyarıları</h2><?php table(['Kitap', 'Stok', 'Kritik'], array_map(fn($s) => [$s['ad'], $s['stok'], $s['kritik_stok']], $crit), ['int' => [1, 2]]); ?></div><?php endif; ?>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>

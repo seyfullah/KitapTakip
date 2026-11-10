@@ -39,6 +39,21 @@ CREATE TABLE IF NOT EXISTS customers (
   KEY (ad), KEY (il, ilce)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS stock_out (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  book_id INT NOT NULL,
+  customer_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  adet INT NOT NULL,
+  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
+  alan_kisi VARCHAR(120) NOT NULL,
+  teslim_yeri VARCHAR(255) NOT NULL,
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih),
+  FOREIGN KEY (book_id) REFERENCES books(id),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS sales (
   id INT AUTO_INCREMENT PRIMARY KEY,
   customer_id INT NOT NULL,
@@ -70,5 +85,19 @@ CREATE TABLE IF NOT EXISTS payments (
   yontem VARCHAR(40) NOT NULL DEFAULT 'Nakit',
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
   KEY (tarih),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS notification_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT NOT NULL,
+  hafta_baslangici DATE NOT NULL,
+  kanal ENUM('E-posta','SMS') NOT NULL,
+  durum ENUM('gönderildi','başarısız','atlandı') NOT NULL,
+  hedef VARCHAR(255) NOT NULL DEFAULT '',
+  hata TEXT NULL,
+  guncellendi TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY haftalik_bildirim (customer_id, hafta_baslangici, kanal),
+  KEY bildirim_tarih (hafta_baslangici),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 ) ENGINE=InnoDB;

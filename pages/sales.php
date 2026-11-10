@@ -19,15 +19,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lines[] = [$bid, $adet, round($adet / max(1, $b['koli_adedi']), 2), $fiyat, round($adet * $fiyat, 2)];
         $need[$bid] = ($need[$bid] ?? 0) + $adet;
     }
-    foreach ($need as $bid => $n) if ($n > book_stock($bid)) $err .= ' ' . val('SELECT ad FROM books WHERE id = ?', [$bid]) . ' için stok yetersiz (stok: ' . book_stock($bid) . ').';
     if (!$cid || !$lines) $err = 'Müşteri ve en az bir kitap satırı zorunludur.';
     if ($err) { flash(trim($err)); redirect('?p=sales'); }
     $pdo = db(); $pdo->beginTransaction();
     try {
+        $bookIds = array_keys($need);
+        sort($bookIds, SORT_NUMERIC);
+        foreach ($bookIds as $bookId) q('SELECT id FROM books WHERE id = ? FOR UPDATE', [$bookId]);
+        foreach ($need as $bid => $n) {
+            $available = book_stock((int) $bid);
+            if ($n > $available) throw new DomainException(val('SELECT ad FROM books WHERE id = ?', [$bid]) . " için stok yetersiz (stok: $available).");
+        }
         q('INSERT INTO sales (customer_id, tarih, vade_tarihi, aciklama, toplam) VALUES (?,?,?,?,?)', [$cid, $tarih, $vade, post('aciklama'), array_sum(array_column($lines, 4))]);
         $sid = (int) $pdo->lastInsertId();
         foreach ($lines as $l) q('INSERT INTO sale_items (sale_id, book_id, adet, koli, birim_fiyat, toplam) VALUES (?,?,?,?,?,?)', [$sid, ...$l]);
         $pdo->commit();
+    } catch (DomainException $e) {
+        $pdo->rollBack(); flash($e->getMessage()); redirect('?p=sales');
     } catch (Throwable $t) { $pdo->rollBack(); throw $t; }
     flash("Satış #$sid kaydedildi, stoktan düşüldü."); after_write();
     redirect('?p=sales');

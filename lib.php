@@ -63,19 +63,24 @@ function customer_opts(bool $blank = false, string $tip = ''): array {
 
 /* ---------------- İş mantığı ---------------- */
 
-/** Güncel stok = toplam giriş - toplam satış (otomatik düşüm). */
+/** Güncel stok = toplam giriş - satış - diğer stok çıkışları. */
 function stock_report(): array {
     return rows("SELECT b.id, b.kod, b.ad, b.yayinevi, b.sinif, b.koli_adedi, b.kritik_stok,
-        COALESCE(si.t,0) AS giris, COALESCE(sa.t,0) AS satilan,
-        COALESCE(si.t,0) - COALESCE(sa.t,0) AS stok,
-        (COALESCE(si.t,0) - COALESCE(sa.t,0)) * b.alis_fiyati AS stok_degeri
+        COALESCE(si.t,0) AS giris, COALESCE(sa.t,0) AS satilan, COALESCE(so.t,0) AS diger_cikis,
+        COALESCE(si.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) AS stok,
+        (COALESCE(si.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0)) * b.alis_fiyati AS stok_degeri
         FROM books b
         LEFT JOIN (SELECT book_id, SUM(adet) t FROM stock_in GROUP BY book_id) si ON si.book_id = b.id
         LEFT JOIN (SELECT book_id, SUM(adet) t FROM sale_items GROUP BY book_id) sa ON sa.book_id = b.id
+        LEFT JOIN (SELECT book_id, SUM(adet) t FROM stock_out GROUP BY book_id) so ON so.book_id = b.id
         ORDER BY b.ad");
 }
 function book_stock(int $bookId): int {
-    $r = row('SELECT (SELECT COALESCE(SUM(adet),0) FROM stock_in WHERE book_id = :b) - (SELECT COALESCE(SUM(adet),0) FROM sale_items WHERE book_id = :b2) s', ['b' => $bookId, 'b2' => $bookId]);
+    $r = row('SELECT
+        (SELECT COALESCE(SUM(adet),0) FROM stock_in WHERE book_id = :b)
+        - (SELECT COALESCE(SUM(adet),0) FROM sale_items WHERE book_id = :b2)
+        - (SELECT COALESCE(SUM(adet),0) FROM stock_out WHERE book_id = :b3) s',
+        ['b' => $bookId, 'b2' => $bookId, 'b3' => $bookId]);
     return (int) $r['s'];
 }
 
@@ -84,7 +89,7 @@ function customer_balances(string $from = '', string $to = ''): array {
     $sw = ''; $pw = ''; $p = [];
     if ($from !== '') { $sw .= ' AND tarih >= :f1'; $pw .= ' AND tarih >= :f2'; $p['f1'] = $p['f2'] = $from; }
     if ($to !== '') { $sw .= ' AND tarih <= :t1'; $pw .= ' AND tarih <= :t2'; $p['t1'] = $p['t2'] = $to; }
-    return rows("SELECT c.id, c.tip, c.ad, c.il, c.ilce, c.telefon,
+    return rows("SELECT c.id, c.tip, c.ad, c.il, c.ilce, c.telefon, c.eposta,
         COALESCE(s.t,0) AS satis, COALESCE(p.t,0) AS tahsilat, COALESCE(s.t,0) - COALESCE(p.t,0) AS kalan
         FROM customers c
         LEFT JOIN (SELECT customer_id, SUM(toplam) t FROM sales WHERE 1=1 $sw GROUP BY customer_id) s ON s.customer_id = c.id
@@ -190,9 +195,9 @@ function report(string $key, array $f = []): array {
             return [['Müşteri', 'Tip', 'İl', 'İlçe', 'Toplam Satış', 'Toplam Tahsilat', 'Kalan Alacak'], $out];
         case 'stok':
             $out = [];
-            foreach (stock_report() as $s) $out[] = ['kod' => $s['kod'], 'ad' => $s['ad'], 'yayinevi' => $s['yayinevi'], 'sinif' => $s['sinif'], 'giris' => $s['giris'], 'satilan' => $s['satilan'],
+            foreach (stock_report() as $s) $out[] = ['kod' => $s['kod'], 'ad' => $s['ad'], 'yayinevi' => $s['yayinevi'], 'sinif' => $s['sinif'], 'giris' => $s['giris'], 'satilan' => $s['satilan'], 'diger_cikis' => $s['diger_cikis'],
                 'stok' => $s['stok'], 'koli' => $s['koli_adedi'] > 0 ? round($s['stok'] / $s['koli_adedi'], 2) : '', 'kritik' => $s['kritik_stok'], 'durum' => $s['stok'] <= $s['kritik_stok'] ? 'KRİTİK' : 'Yeterli', 'deger' => $s['stok_degeri']];
-            return [['Kod', 'Kitap', 'Yayınevi', 'Sınıf', 'Toplam Giriş', 'Satılan', 'Güncel Stok', 'Koli', 'Kritik Seviye', 'Durum', 'Stok Değeri (Alış)'], $out];
+            return [['Kod', 'Kitap', 'Yayınevi', 'Sınıf', 'Toplam Giriş', 'Satılan', 'Diğer Çıkış', 'Güncel Stok', 'Koli', 'Kritik Seviye', 'Durum', 'Stok Değeri (Alış)'], $out];
         case 'vadesi':
             $out = [];
             foreach (overdue_rows(!empty($f['customer_id']) ? (int) $f['customer_id'] : null) as $o)
@@ -233,10 +238,13 @@ function export_sets(): array {
         FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY s.tarih, s.id');
     $pay = rows('SELECT p.tarih, c.ad musteri, p.tutar, p.yontem, p.aciklama FROM payments p JOIN customers c ON c.id = p.customer_id ORDER BY p.tarih, p.id');
     $stockIn = rows('SELECT i.tarih, b.kod, b.ad kitap, i.adet, i.aciklama FROM stock_in i JOIN books b ON b.id = i.book_id ORDER BY i.tarih, i.id');
+    $stockOut = rows('SELECT o.tarih, b.kod, b.ad kitap, c.ad musteri, o.alan_kisi, o.teslim_yeri, o.adet, o.koli, o.aciklama
+        FROM stock_out o JOIN books b ON b.id = o.book_id JOIN customers c ON c.id = o.customer_id ORDER BY o.tarih, o.id');
     return [
         'Kitaplar' => [['Kod', 'Kitap Adı', 'Yayınevi', 'Sınıf', 'Alış Fiyatı', 'Satış Fiyatı', 'Koli Adedi', 'Kritik Stok'], $books],
         'Müşteriler' => [['No', 'Tip', 'Ad', 'İl', 'İlçe', 'Yetkili', 'Telefon', 'E-posta', 'Adres'], $cust],
         'Stok Girişleri' => [['Tarih', 'Kod', 'Kitap', 'Adet', 'Açıklama'], $stockIn],
+        'Stok Çıkışları' => [['Tarih', 'Kod', 'Kitap', 'Müşteri', 'Teslim Alan', 'Teslim Yeri', 'Adet', 'Koli', 'Açıklama'], $stockOut],
         'Satışlar' => [['Satış No', 'Tarih', 'Vade', 'Müşteri', 'Tip', 'İl', 'İlçe', 'Kod', 'Kitap', 'Adet', 'Koli', 'Birim Fiyat', 'Tutar'], $sales],
         'Tahsilatlar' => [['Tarih', 'Müşteri', 'Tutar', 'Yöntem', 'Açıklama'], $pay],
         'Güncel Stok' => report('stok', $f),
@@ -359,23 +367,133 @@ function after_write(): void {
     }
 }
 
+function reminder_channels_configured(): array {
+    return [
+        'email' => (bool) cfg('mail_from_email'),
+        'sms' => (bool) (cfg('sms_twilio_sid') && cfg('sms_twilio_token') && cfg('sms_twilio_from')),
+    ];
+}
+
+function sms_e164(string $phone): ?string {
+    $trimmed = trim($phone);
+    $digits = preg_replace('/\D+/', '', $trimmed);
+    if (str_starts_with($trimmed, '+') && strlen($digits) >= 8 && strlen($digits) <= 15) return '+' . $digits;
+    if (str_starts_with($digits, '00')) $digits = substr($digits, 2);
+    if (strlen($digits) === 11 && str_starts_with($digits, '0')) $digits = '90' . substr($digits, 1);
+    elseif (strlen($digits) === 10) $digits = '90' . $digits;
+    if (strlen($digits) >= 12 && strlen($digits) <= 15) return '+' . $digits;
+    return null;
+}
+
+function send_reminder_email(array $customer, float $balance): void {
+    $from = (string) cfg('mail_from_email');
+    if (!filter_var($customer['eposta'], FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Müşterinin geçerli e-posta adresi yok.');
+    if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('MAIL_FROM_EMAIL geçerli bir e-posta adresi olmalıdır.');
+    $fromName = mb_encode_mimeheader(str_replace(["\r", "\n"], '', (string) cfg('mail_from_name')), 'UTF-8');
+    $subject = mb_encode_mimeheader('Cari hesap bakiye bilgilendirmesi', 'UTF-8');
+    $contact = trim((string) cfg('reminder_contact'));
+    $body = "Sayın {$customer['ad']},\n\n"
+        . 'Cari hesabınızda ' . money($balance) . " bakiye görünmektedir.\n"
+        . "Ödemeniz varsa lütfen bu mesajı dikkate almayınız. Hesap mutabakatı veya ödeme bilgisi için bizimle iletişime geçebilirsiniz."
+        . ($contact !== '' ? "\nİletişim: $contact" : '')
+        . "\n\n" . (string) cfg('mail_from_name');
+    $headers = "From: $fromName <$from>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8";
+    if (!mail($customer['eposta'], $subject, $body, $headers)) throw new RuntimeException('PHP mail() e-posta gönderimini kabul etmedi.');
+}
+
+function send_reminder_sms(array $customer, float $balance): void {
+    $to = sms_e164((string) $customer['telefon']);
+    if (!$to) throw new RuntimeException('Müşterinin telefonu uluslararası biçimde geçerli değil.');
+    $sid = (string) cfg('sms_twilio_sid');
+    $url = 'https://api.twilio.com/2010-04-01/Accounts/' . rawurlencode($sid) . '/Messages.json';
+    $contact = trim((string) cfg('reminder_contact'));
+    $body = (string) cfg('mail_from_name') . ': Cari hesabınızda ' . money($balance)
+        . ' bakiye görünmektedir. Ödemeniz varsa bu mesajı dikkate almayınız.'
+        . ($contact !== '' ? ' İletişim: ' . $contact : '');
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+        CURLOPT_USERPWD => $sid . ':' . (string) cfg('sms_twilio_token'),
+        CURLOPT_POSTFIELDS => http_build_query(['To' => $to, 'From' => (string) cfg('sms_twilio_from'), 'Body' => $body]),
+    ]);
+    $response = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    if ($response === false) throw new RuntimeException('Twilio bağlantı hatası: ' . $curlError);
+    $result = json_decode($response, true) ?? [];
+    if ($status < 200 || $status >= 300) throw new RuntimeException('Twilio SMS hatası (' . $status . '): ' . ($result['message'] ?? 'sağlayıcı isteği reddetti'));
+}
+
+/**
+ * Her müşteri ve kanal için haftada en fazla bir başarılı hatırlatma gönderir.
+ * Başarısız veya iletişim bilgisi eksik kayıtlar sonraki çalıştırmada tekrar denenebilir.
+ */
+function send_weekly_reminders(): array {
+    $configured = reminder_channels_configured();
+    if (!$configured['email']) throw new RuntimeException('E-posta için MAIL_FROM_EMAIL yapılandırılmalıdır.');
+    if (!$configured['sms']) throw new RuntimeException('SMS için Twilio hesap bilgileri yapılandırılmalıdır.');
+
+    $now = new DateTimeImmutable('now', new DateTimeZone('Europe/Istanbul'));
+    $weekStart = $now->modify('-' . ((int) $now->format('N') - 1) . ' days')->format('Y-m-d');
+    $counts = ['müşteri' => 0, 'gönderildi' => 0, 'başarısız' => 0, 'atlandı' => 0];
+    $senders = [
+        'E-posta' => fn($customer, $balance) => send_reminder_email($customer, $balance),
+        'SMS' => fn($customer, $balance) => send_reminder_sms($customer, $balance),
+    ];
+
+    foreach (customer_balances() as $customer) {
+        $balance = (float) $customer['kalan'];
+        if ($balance <= 0.004) continue;
+        $counts['müşteri']++;
+        foreach ($senders as $channel => $send) {
+            $existing = row('SELECT durum FROM notification_log WHERE customer_id = ? AND hafta_baslangici = ? AND kanal = ?',
+                [$customer['id'], $weekStart, $channel]);
+            if (($existing['durum'] ?? '') === 'gönderildi') continue;
+
+            $target = $channel === 'E-posta' ? (string) $customer['eposta'] : (string) $customer['telefon'];
+            try {
+                if ($target === '') throw new DomainException('İletişim bilgisi eksik.');
+                $send($customer, $balance);
+                $status = 'gönderildi';
+                $error = null;
+            } catch (DomainException $e) {
+                $status = 'atlandı';
+                $error = $e->getMessage();
+            } catch (Throwable $e) {
+                $status = 'başarısız';
+                $error = $e->getMessage();
+            }
+
+            q('INSERT INTO notification_log (customer_id, hafta_baslangici, kanal, durum, hedef, hata) VALUES (?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE durum=VALUES(durum), hedef=VALUES(hedef), hata=VALUES(hata)',
+                [$customer['id'], $weekStart, $channel, $status, $target, $error]);
+            $counts[$status]++;
+        }
+    }
+    return $counts;
+}
+
 /* ---------------- Düzen ---------------- */
 
 function layout_head(string $title, string $page): void {
     $menu = ['dashboard' => '📊 Panel', 'books' => '📚 Kitaplar', 'stock' => '📦 Stok', 'customers' => '🏫 Müşteriler', 'sales' => '🚚 Satışlar',
-        'payments' => '💰 Tahsilat', 'cari' => '🧾 Cari / Ekstre', 'overdue' => '⏰ Vadeli Alacak', 'reports' => '📋 Raporlar', 'export' => '📤 Excel / Sheets'];
-    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"></head><body><nav class="no-print"><b>Kitap Dağıtım & Cari</b>';
+        'payments' => '💰 Tahsilat', 'cari' => '🧾 Cari / Ekstre', 'overdue' => '⏰ Vadeli Alacak', 'notifications' => '🔔 Bildirimler', 'reports' => '📋 Raporlar', 'export' => '📤 Excel / Sheets'];
+    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print"><b class="brand">📚 Kitap Cari</b><div class="nav-links">';
     foreach ($menu as $k => $v) echo '<a href="?p=' . $k . '"' . ($k === $page ? ' class="on"' : '') . '>' . $v . '</a>';
-    echo '<a href="?p=logout" class="out">Çıkış</a></nav><main>';
+    echo '</div><a href="?p=logout" class="out">Çıkış</a></nav><main>';
     if ($m = flash()) echo '<div class="flash">' . h($m) . '</div>';
     echo '<h1>' . h($title) . '</h1>';
 }
-function layout_foot(): void { echo '</main></body></html>'; }
+function layout_foot(): void { echo '</main><footer>Kitap Dağıtım & Cari</footer></body></html>'; }
 
 function table(array $head, array $data, array $opts = []): void {
     $money = $opts['money'] ?? []; $ints = $opts['int'] ?? []; $totals = $opts['totals'] ?? [];
-    echo '<table><thead><tr>';
-    foreach ($head as $hh) echo '<th>' . h($hh) . '</th>';
+    echo '<div class="table-wrap"><table class="sortable-table"><thead><tr>';
+    foreach ($head as $hh) echo '<th scope="col"><button class="sort-button" type="button"><span>' . h($hh) . '</span><span class="sort-indicator" aria-hidden="true">↕</span></button></th>';
     echo '</tr></thead><tbody>';
     $sum = [];
     foreach ($data as $r) {
@@ -394,5 +512,5 @@ function table(array $head, array $data, array $opts = []): void {
         foreach ($head as $i => $_) echo isset($sum[$i]) ? '<td class="r">' . (in_array($i, $money, true) ? money($sum[$i]) : num($sum[$i])) . '</td>' : '<td>' . ($i === 0 ? 'TOPLAM' : '') . '</td>';
         echo '</tr>';
     }
-    echo '</tbody></table>';
+    echo '</tbody></table></div>';
 }

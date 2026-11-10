@@ -21,7 +21,7 @@ if ($p === 'login') {
         }
         $err = 'Kullanıcı adı veya şifre hatalı.';
     }
-    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Giriş</title><link rel="stylesheet" href="assets/style.css"></head><body class="login"><form method="post" class="card"><h1>Kitap Dağıtım & Cari</h1>';
+    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Giriş</title><link rel="stylesheet" href="assets/style.css"></head><body class="login"><form method="post" class="card"><h1>Kitap Dağıtım & Cari</h1>';
     if ($err) echo '<div class="flash err">' . h($err) . '</div>';
     echo '<input type="hidden" name="_csrf" value="' . csrf() . '"><label>Kullanıcı<input name="kullanici" autofocus required></label><label>Şifre<input type="password" name="sifre" required></label><button>Giriş</button></form></body></html>';
     exit;
@@ -30,6 +30,6 @@ if ($p === 'login') {
 if (empty($_SESSION['uid'])) redirect('?p=login');
 csrf_check();
 
-$pages = ['dashboard', 'books', 'stock', 'customers', 'sales', 'payments', 'cari', 'overdue', 'reports', 'export'];
+$pages = ['dashboard', 'books', 'stock', 'customers', 'sales', 'payments', 'cari', 'overdue', 'notifications', 'reports', 'export'];
 if (!in_array($p, $pages, true)) { http_response_code(404); $p = 'dashboard'; }
 require __DIR__ . '/pages/' . $p . '.php';
