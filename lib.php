@@ -736,8 +736,9 @@ function send_weekly_reminders(): array {
 
 function layout_head(string $title, string $page): void {
     $groups = [
-        'Stok' => ['books' => 'Kitaplar', 'stock_in' => 'Stok Girişi', 'stock_out' => 'Satış Teslimatı',
-            'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri', 'people' => 'Kişiler'],
+        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler'],
+        'Stok' => ['stock_in' => 'Stok Girişi', 'stock_out' => 'Teslimat Bekleyen Satışlar',
+            'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri'],
         'Satış ve İade' => ['sales' => 'Satışlar', 'returns_customer' => 'Müşteri İadesi',
             'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi'],
         'Müşteriler' => ['customers' => 'Müşteri Kartları', 'payments' => 'Tahsilat', 'cari' => 'Cari / Ekstre', 'overdue' => 'Vadeli Alacak'],

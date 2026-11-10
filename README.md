@@ -12,9 +12,9 @@ PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulamas
 - Yazdırılabilir ekstre ve çok sekmeli Excel (`.xlsx`) dışa aktarımı
 - Google Sheets'e elle veya cron ile veri aktarımı
 - Mobil uyumlu modern arayüz; listelerde arama ve sütun başlığına tıklayarak sıralama
-- Üst menüde stok, satış ve iade, müşteriler, finans ve diğer işlemler için alt menüler
+- Üst menüde tanımlar, stok, satış ve iade, müşteriler, finans ve diğer işlemler için alt menüler
 - Yönetilebilir ortak kişi listesi; stok girişinde teslim alan ve satış teslimatında götüren kişi seçimi
-- Satış kalemleri için kısmi teslimat; teslim tarihi ve müşteri tarafındaki teslim alan kaydı
+- Teslimat bekleyen satışlar ve sipariş içeriği; satış kalemleri için kısmi teslimat, teslim tarihi ve teslim alan kaydı
 - Satış, stok çıkışı ve tedarikçi iadeleri; stok ve ilgili müşteri bakiyesi güncellemesi
 - Gider, bağış ve alınan borç/borç ödemesi kayıtları ile kâr-zarar özeti
 - Stok girişine bağlı alış tutarı, vade, tedarikçi ödemeleri ve iade fazlası alacak takibi

@@ -90,6 +90,23 @@ try {
     $check(book_stock(1) === $before, 'Satış teslimatı stoğu tekrar düşürdü.');
     $sets = export_sets();
     $check(count($sets['Satış Teslimatları'][1]) === 1 && count($sets['Tedarikçi Ödemeleri'][1]) === 1, 'Yeni hareketler dışa aktarılmadı.');
+    q('INSERT INTO sales (id, customer_id, tarih, vade_tarihi, aciklama, toplam) VALUES (?,?,?,?,?,?)', [2, 1, '2025-01-08', '2025-02-08', 'Sipariş notu', 30]);
+    q('INSERT INTO sale_items (id, sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?,?)', [2, 2, 1, 1, 10, 5, 10]);
+    q('INSERT INTO sale_items (id, sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?,?)', [3, 2, 1, 2, 10, 5, 20]);
+    q('INSERT INTO sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)', [2, '2025-01-09', 1, 'Görevli', 'Alıcı']);
+    $_SESSION = [];
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_GET = [];
+    ob_start();
+    require __DIR__ . '/../pages/stock_out.php';
+    $list = ob_get_clean();
+    $check(str_contains($list, 'sale_id=2') && !str_contains($list, 'sale_id=1'), 'Bekleyen satış listesi yanlış.');
+    $_GET = ['sale_id' => '2'];
+    ob_start();
+    require __DIR__ . '/../pages/stock_out.php';
+    $detail = ob_get_clean();
+    $check(str_contains($detail, 'Sipariş notu') && str_contains($detail, 'Sipariş İçeriği'), 'Sipariş ayrıntıları gösterilmedi.');
+    $check(str_contains($detail, 'value="3"') && !str_contains($detail, 'value="2">BK'), 'Teslimat seçiminde bekleyen kalemler yanlış.');
     echo "SQLite yükseltmesi ve eski veriler doğrulandı.\n";
 } finally {
     unlink($path);
