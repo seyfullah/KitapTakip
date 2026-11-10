@@ -168,3 +168,63 @@ CREATE TABLE IF NOT EXISTS notification_log (
   KEY bildirim_tarih (hafta_baslangici),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 ) ENGINE=InnoDB;
+
+-- Existing installations may have the old stock and book columns.
+SET @add_stock_receiver = (SELECT COUNT(*) = 0 FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'stock_in' AND column_name = 'teslim_alan');
+SET @migration_sql = IF(@add_stock_receiver,
+  'ALTER TABLE stock_in ADD COLUMN teslim_alan VARCHAR(120) NOT NULL DEFAULT ''''', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @add_stock_carrier = (SELECT COUNT(*) = 0 FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'stock_out' AND column_name = 'goturen_kisi');
+SET @migration_sql = IF(@add_stock_carrier,
+  'ALTER TABLE stock_out ADD COLUMN goturen_kisi VARCHAR(120) NOT NULL DEFAULT ''''', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'stock_out' AND column_name = 'alan_kisi') > 0,
+  'ALTER TABLE stock_out DROP COLUMN alan_kisi', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'stock_out' AND column_name = 'teslim_yeri') > 0,
+  'ALTER TABLE stock_out DROP COLUMN teslim_yeri', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'books' AND column_name = 'yayinevi') > 0,
+  'ALTER TABLE books DROP COLUMN yayinevi', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'books' AND column_name = 'sinif') > 0,
+  'ALTER TABLE books DROP COLUMN sinif', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @add_sale_cost = (SELECT COUNT(*) = 0 FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'sale_items' AND column_name = 'maliyet_birim');
+SET @migration_sql = IF(@add_sale_cost,
+  'ALTER TABLE sale_items ADD COLUMN maliyet_birim DECIMAL(12,2) NOT NULL DEFAULT 0', 'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;
+
+SET @migration_sql = IF(@add_sale_cost,
+  'UPDATE sale_items SET maliyet_birim = COALESCE((SELECT alis_fiyati FROM books WHERE books.id = sale_items.book_id), 0)',
+  'SET @migration_noop = 1');
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;

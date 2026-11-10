@@ -3,6 +3,38 @@ declare(strict_types=1);
 
 function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; return $c[$k] ?? null; }
 
+function sqlite_upgrade(PDO $pdo): void {
+    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 1) return;
+
+    $pdo->exec('BEGIN IMMEDIATE');
+    try {
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 1) {
+            $columns = static fn(string $table): array => array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+            $stockIn = $columns('stock_in');
+            if ($stockIn && !in_array('teslim_alan', $stockIn, true)) {
+                $pdo->exec("ALTER TABLE stock_in ADD COLUMN teslim_alan TEXT NOT NULL DEFAULT ''");
+            }
+            $stockOut = $columns('stock_out');
+            if ($stockOut && !in_array('goturen_kisi', $stockOut, true)) {
+                $pdo->exec("ALTER TABLE stock_out ADD COLUMN goturen_kisi TEXT NOT NULL DEFAULT ''");
+            }
+            $saleItems = $columns('sale_items');
+            if ($saleItems && !in_array('maliyet_birim', $saleItems, true)) {
+                $pdo->exec('ALTER TABLE sale_items ADD COLUMN maliyet_birim NUMERIC NOT NULL DEFAULT 0');
+                $pdo->exec('UPDATE sale_items SET maliyet_birim = COALESCE((SELECT alis_fiyati FROM books WHERE books.id = sale_items.book_id), 0)');
+            }
+            $schema = file_get_contents(__DIR__ . '/sql/schema.sqlite.sql');
+            if ($schema === false) throw new RuntimeException('SQLite şema dosyası okunamadı.');
+            $pdo->exec($schema);
+            $pdo->exec('PRAGMA user_version = 1');
+        }
+        $pdo->exec('COMMIT');
+    } catch (Throwable $e) {
+        $pdo->exec('ROLLBACK');
+        throw $e;
+    }
+}
+
 function db(): PDO {
     static $pdo;
     if (!$pdo) {
@@ -37,6 +69,7 @@ function db(): PDO {
                 $map = ['%Y' => 'Y', '%m' => 'm', '%d' => 'd'];
                 return date(strtr((string) $format, $map), strtotime((string) $date));
             }, 2);
+            sqlite_upgrade($pdo);
         } else {
             $pdo = new PDO('mysql:host=' . cfg('db_host') . ';dbname=' . cfg('db_name') . ';charset=utf8mb4',
                 cfg('db_user'), cfg('db_pass'), $options);
@@ -48,6 +81,21 @@ function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql);
 function rows(string $sql, array $p = []): array { return q($sql, $p)->fetchAll(); }
 function row(string $sql, array $p = []): ?array { return q($sql, $p)->fetch() ?: null; }
 function val(string $sql, array $p = []) { $r = q($sql, $p)->fetch(PDO::FETCH_NUM); return $r ? $r[0] : null; }
+
+function insert_stock_out(int $bookId, int $customerId, string $date, int $units, float $cartons, string $carrier, string $description): void {
+    $fields = ['book_id', 'customer_id', 'tarih', 'adet', 'koli', 'goturen_kisi', 'aciklama'];
+    $values = [$bookId, $customerId, $date, $units, $cartons, $carrier, $description];
+    if (cfg('app_storage') === 'sqlite') {
+        $columns = array_column(db()->query('PRAGMA table_info(stock_out)')->fetchAll(), 'name');
+        foreach (['alan_kisi', 'teslim_yeri'] as $column) {
+            if (in_array($column, $columns, true)) {
+                $fields[] = $column;
+                $values[] = '';
+            }
+        }
+    }
+    q('INSERT INTO stock_out (' . implode(', ', $fields) . ') VALUES (' . implode(', ', array_fill(0, count($fields), '?')) . ')', $values);
+}
 
 function h($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); }
 function money($v): string { return number_format((float) $v, 2, ',', '.') . ' TL'; }

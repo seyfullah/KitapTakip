@@ -1,6 +1,6 @@
 # Kitap Dağıtım ve Cari Takip
 
-PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulaması.
+PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulaması. Varsayılan olarak sunucu gerektirmeyen SQLite dosyası kullanır; MySQL/MariaDB isteğe bağlıdır.
 
 ## Özellikler
 
@@ -20,9 +20,9 @@ PHP ve MySQL/MariaDB tabanlı, Türkçe kitap dağıtımı, stok, satış ve car
 
 ## Hızlı deneme (MySQL ve e-posta olmadan)
 
-Yerel deneme modu verileri tek bir dosya tabanlı SQLite veritabanında tutar; MySQL sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır.
+Varsayılan dosya modu verileri tek bir SQLite dosyasında tutar; MySQL/MariaDB sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır. Mevcut SQLite dosyaları uygulama açıldığında otomatik ve işlem içinde güncellenir; eski kayıtlar korunur.
 
-Mevcut kurulumu güncellerken, uygulama dosyalarını aldıktan sonra veritabanı şemasını bir kez `php migrate.php` komutuyla güncelleyin. Bu işlem eski teslim yeri, yayınevi ve sınıf seviyesi sütunlarını ve içlerindeki verileri kaldırır; eski satışların kitap maliyetini mevcut kitap alış fiyatıyla yaklaşık olarak doldurur. Kâr/zarar; net satış, satış anındaki kitap maliyeti, gider ve bağışlardan hesaplanır. Alınan borç ve anapara geri ödemeleri kâr/zarardan ayrı izlenir.
+Güncellemeden önce veri dosyanızı yedekleyin. Eski satışların kitap maliyeti, yükseltme sırasında mevcut kitap alış fiyatıyla yaklaşık olarak doldurulur. Eski teslim alan, teslim yeri, yayınevi ve sınıf seviyesi verileri dosyada korunur, ancak yeni arayüzde kullanılmaz. Kâr/zarar; net satış, satış anındaki kitap maliyeti, gider ve bağışlardan hesaplanır. Alınan borç ve anapara geri ödemeleri kâr/zarardan ayrı izlenir.
 
 1. Örnek veriler ve `admin / admin123` hesabıyla yerel dosyayı hazırlayın:
 
@@ -35,7 +35,7 @@ Mevcut kurulumu güncellerken, uygulama dosyalarını aldıktan sonra veritaban�
 2. Yerel web sunucusunu başlatın:
 
    ```sh
-   APP_STORAGE=sqlite php -S 127.0.0.1:8000
+   php -S 127.0.0.1:8000
    ```
 
 3. `http://127.0.0.1:8000` adresinden `admin / admin123` ile giriş yapın. Kitap, stok girişi/teslimatı, müşteri, satış ve tahsilat kayıtları dosyada saklanır ve sunucu yeniden başlatıldığında korunur. Demo verisini yeniden oluşturmak veya sıfırlamak için SQLite dosyasını silip `php install.php --sqlite --demo` komutunu tekrar çalıştırın. Bu varsayılan hesabı yalnızca yerel testte kullanın; sunucuyu `127.0.0.1` adresine bağlayın ve deneme modunu internete açmayın.
@@ -48,7 +48,7 @@ Bu modda gerçek e-posta/SMS gönderimi özellikle devre dışıdır; `cron_noti
 - Üretim MySQL modu için MySQL 8+ veya MariaDB 10.4+ (yerel deneme modunda MySQL gerekmez)
 - Google Sheets entegrasyonu için Google Cloud servis hesabı ve Sheets API erişimi (isteğe bağlı)
 
-## Kurulum
+## MySQL/MariaDB kurulumu (isteğe bağlı)
 
 1. Yetkili bir MySQL/MariaDB hesabıyla veritabanı ve uygulama kullanıcısı oluşturun. Uygulama kullanıcısına yalnızca bu veritabanı üzerinde yetki verin:
 
@@ -58,26 +58,28 @@ Bu modda gerçek e-posta/SMS gönderimi özellikle devre dışıdır; `cron_noti
    GRANT ALL PRIVILEGES ON kitapcari.* TO 'kitapcari_app'@'localhost';
    ```
 
-2. Bağlantıyı `config.php` içinden veya `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` ortam değişkenleriyle ayarlayın. Örneğin `DB_NAME=kitapcari`, `DB_USER=kitapcari_app` ve `DB_PASS` veritabanı kullanıcısının parolası olmalıdır.
+2. Tüm uygulama, kurulum ve cron işlemleri için `APP_STORAGE=mysql` ayarlayın. Bağlantıyı `config.php` içinden veya `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` ortam değişkenleriyle ayarlayın. Örneğin `DB_NAME=kitapcari`, `DB_USER=kitapcari_app` ve `DB_PASS` veritabanı kullanıcısının parolası olmalıdır.
 3. Proje dizininde şemayı kurup yönetici hesabı oluşturun:
 
    ```sh
-   php install.php admin 'uzun-ve-benzersiz-bir-sifre'
+   APP_STORAGE=mysql php install.php admin 'uzun-ve-benzersiz-bir-sifre'
    ```
 
    İsteğe bağlı örnek veriler için:
 
    ```sh
-   php install.php admin 'uzun-ve-benzersiz-bir-sifre' --demo
+   APP_STORAGE=mysql php install.php admin 'uzun-ve-benzersiz-bir-sifre' --demo
    ```
 
 4. Geliştirme amacıyla yerel sunucuyu başlatın:
 
    ```sh
-   php -S 127.0.0.1:8000
+   APP_STORAGE=mysql php -S 127.0.0.1:8000
    ```
 
    Tarayıcıda `http://127.0.0.1:8000` adresini açın. Üretim ortamında PHP destekli Apache veya başka bir web sunucusu kullanın; uygulamayı HTTPS üzerinden sunun ve proje içindeki `sql/`, `config.php`, `lib.php`, `install.php`, `cron_sync.php` ile servis hesabı anahtar dosyasına web üzerinden erişimi engelleyin. Kurulumdan sonra `install.php` dosyasını web erişimine açık bırakmayın.
+
+   Mevcut MySQL/MariaDB kurulumlarını güncellerken önce yedek alın, sonra `mysql -u kitapcari_app -p kitapcari < sql/schema.sql` çalıştırın. Bu işlem eski teslim alan, teslim yeri, yayınevi ve sınıf seviyesi sütunlarını kaldırır.
 
 ## Google Sheets
 

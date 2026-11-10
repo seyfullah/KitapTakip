@@ -40,8 +40,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     if (!row('SELECT id FROM books WHERE id = ?' . $lock, [$bid])) throw new DomainException('Kitap bulunamadı.');
                     $available = book_stock($bid);
                     if ($adet > $available) throw new DomainException("Stok yetersiz (mevcut: $available adet).");
-                    q('INSERT INTO stock_out (book_id, customer_id, tarih, adet, koli, goturen_kisi, aciklama) VALUES (?,?,?,?,?,?,?)',
-                        [$bid, $cid, post('tarih', date('Y-m-d')), $adet, $koli, post('goturen_kisi'), post('aciklama')]);
+                    insert_stock_out($bid, $cid, post('tarih', date('Y-m-d')), $adet, $koli, post('goturen_kisi'), post('aciklama'));
                     $pdo->commit();
                     flash("Stok çıkışı kaydedildi ($adet adet).");
                     after_write();
