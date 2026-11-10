@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PHP: SQLite demo veritabanini kur",
+      "type": "process",
+      "command": "php",
+      "args": [
+        "${workspaceFolder}/install.php",
+        "--sqlite",
+        "--demo"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PHP: SQLite web sunucusunu baslat",
+      "type": "process",
+      "command": "php",
+      "args": [
+        "-S",
+        "127.0.0.1:8000"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "APP_STORAGE": "sqlite"
+        }
+      },
+      "problemMatcher": []
+    }
+  ]
+}
