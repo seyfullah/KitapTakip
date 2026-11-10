@@ -13,7 +13,7 @@ $st = statement($cid, $from, $to);
 $data = [];
 if ($from !== '') $data[] = [dtr($from), 'Devir', 'Önceki dönem bakiyesi', '', '', $st['opening']];
 foreach ($st['rows'] as $r) $data[] = [dtr($r['tarih']), $r['tur'], $r['aciklama'], $r['borc'] ?: '', $r['alacak'] ?: '', $r['bakiye']];
-$head = ['Tarih', 'Tür', 'Açıklama', 'Borç (Satış)', 'Alacak (Tahsilat)', 'Bakiye'];
+$head = ['Tarih', 'Tür', 'Açıklama', 'Borç (Satış)', 'Alacak (Tahsilat / İade)', 'Bakiye'];
 if (get('xlsx')) {
     $items = report('musteri_detay', ['customer_id' => $cid, 'from' => $from, 'to' => $to]);
     xlsx_download('ekstre_' . $cid . '.xlsx', ['Ekstre' => [$head, $data], 'Kitap Detay' => $items]);

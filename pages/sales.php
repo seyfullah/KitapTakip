@@ -1,8 +1,13 @@
 <?php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('act') === 'delete') {
-        q('DELETE FROM sales WHERE id = ?', [(int) post('id')]);
-        flash('Satış silindi, stok geri eklendi.'); after_write();
+        $id = (int) post('id');
+        if ((int) val('SELECT COUNT(*) FROM customer_returns WHERE sale_item_id IN (SELECT id FROM sale_items WHERE sale_id = ?)', [$id])) {
+            flash('İadesi bulunan satış silinemez; önce iade kaydını gözden geçirin.');
+        } else {
+            q('DELETE FROM sales WHERE id = ?', [$id]);
+            flash('Satış silindi, stok geri eklendi.'); after_write();
+        }
         redirect('?p=sales');
     }
     $cid = (int) post('customer_id'); $tarih = post('tarih', date('Y-m-d'));
@@ -16,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($adet <= 0 && $koliIn !== '') $adet = (int) round(dec($koliIn) * $b['koli_adedi']);
         if ($adet <= 0) continue;
         $fiyat = trim((string) ($_POST['fiyat'][$i] ?? '')) !== '' ? dec($_POST['fiyat'][$i]) : (float) $b['satis_fiyati'];
-        $lines[] = [$bid, $adet, round($adet / max(1, $b['koli_adedi']), 2), $fiyat, round($adet * $fiyat, 2)];
+        $lines[] = [$bid, $adet, round($adet / max(1, $b['koli_adedi']), 2), $fiyat, (float) $b['alis_fiyati'], round($adet * $fiyat, 2)];
         $need[$bid] = ($need[$bid] ?? 0) + $adet;
     }
     if (!$cid || !$lines) $err = 'Müşteri ve en az bir kitap satırı zorunludur.';
@@ -32,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         q('INSERT INTO sales (customer_id, tarih, vade_tarihi, aciklama, toplam) VALUES (?,?,?,?,?)', [$cid, $tarih, $vade, post('aciklama'), array_sum(array_column($lines, 4))]);
         $sid = (int) $pdo->lastInsertId();
-        foreach ($lines as $l) q('INSERT INTO sale_items (sale_id, book_id, adet, koli, birim_fiyat, toplam) VALUES (?,?,?,?,?,?)', [$sid, ...$l]);
+        foreach ($lines as $l) q('INSERT INTO sale_items (sale_id, book_id, adet, koli, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?,?)', [$sid, ...$l]);
         $pdo->commit();
     } catch (DomainException $e) {
         $pdo->rollBack(); flash($e->getMessage()); redirect('?p=sales');

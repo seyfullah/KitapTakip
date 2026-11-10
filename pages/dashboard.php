@@ -1,7 +1,8 @@
 <?php
 $stock = stock_report();
 $totStock = array_sum(array_column($stock, 'stok'));
-$sale = (float) val('SELECT COALESCE(SUM(toplam),0) FROM sales');
+$finance = financial_summary();
+$sale = $finance['net_sales'];
 $paid = (float) val('SELECT COALESCE(SUM(tutar),0) FROM payments');
 $od = overdue_rows();
 $crit = array_filter($stock, fn($s) => $s['stok'] <= $s['kritik_stok']);
@@ -24,7 +25,8 @@ $recv = array_slice($recv, 0, 10);
 
 layout_head('Yönetici Paneli', 'dashboard');
 echo '<div class="cards">';
-foreach ([['Toplam Stok', num($totStock) . ' adet', ''], ['Toplam Satış', money($sale), ''], ['Toplam Tahsilat', money($paid), ''], ['Toplam Alacak', money($sale - $paid), ''],
+foreach ([['Toplam Stok', num($totStock) . ' adet', ''], ['Net Satış', money($sale), ''], ['Toplam Tahsilat', money($paid), ''], ['Toplam Alacak', money($sale - $paid), ''],
+    ['Kâr / Zarar', money($finance['profit']), $finance['profit'] < 0 ? 'bad' : ''], ['Kalan Borç', money($finance['debt']), ''],
     ['Vadesi Geçmiş Alacak', money(array_sum(array_column($od, 'kalan'))), 'bad'], ['Kritik Stoklu Kitap', count($crit), $crit ? 'bad' : '']] as [$l, $v, $c])
     echo '<div class="kpi ' . $c . '"><small>' . $l . '</small><div>' . $v . '</div></div>';
 echo '</div>';

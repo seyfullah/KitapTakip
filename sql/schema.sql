@@ -8,13 +8,11 @@ CREATE TABLE IF NOT EXISTS books (
   id INT AUTO_INCREMENT PRIMARY KEY,
   kod VARCHAR(40) NOT NULL UNIQUE,
   ad VARCHAR(200) NOT NULL,
-  yayinevi VARCHAR(120) NOT NULL DEFAULT '',
-  sinif VARCHAR(30) NOT NULL DEFAULT '',
   alis_fiyati DECIMAL(12,2) NOT NULL DEFAULT 0,
   satis_fiyati DECIMAL(12,2) NOT NULL DEFAULT 0,
   koli_adedi INT NOT NULL DEFAULT 1,
   kritik_stok INT NOT NULL DEFAULT 0,
-  KEY (ad), KEY (yayinevi)
+  KEY (ad)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS stock_in (
@@ -22,6 +20,7 @@ CREATE TABLE IF NOT EXISTS stock_in (
   book_id INT NOT NULL,
   tarih DATE NOT NULL,
   adet INT NOT NULL,
+  teslim_alan VARCHAR(120) NOT NULL,
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
   FOREIGN KEY (book_id) REFERENCES books(id)
 ) ENGINE=InnoDB;
@@ -46,8 +45,7 @@ CREATE TABLE IF NOT EXISTS stock_out (
   tarih DATE NOT NULL,
   adet INT NOT NULL,
   koli DECIMAL(10,2) NOT NULL DEFAULT 0,
-  alan_kisi VARCHAR(120) NOT NULL,
-  teslim_yeri VARCHAR(255) NOT NULL,
+  goturen_kisi VARCHAR(120) NOT NULL,
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
   KEY (tarih),
   FOREIGN KEY (book_id) REFERENCES books(id),
@@ -72,8 +70,37 @@ CREATE TABLE IF NOT EXISTS sale_items (
   adet INT NOT NULL,
   koli DECIMAL(10,2) NOT NULL DEFAULT 0,
   birim_fiyat DECIMAL(12,2) NOT NULL,
+  maliyet_birim DECIMAL(12,2) NOT NULL DEFAULT 0,
   toplam DECIMAL(14,2) NOT NULL,
   FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+  FOREIGN KEY (book_id) REFERENCES books(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS customer_returns (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sale_item_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  adet INT NOT NULL,
+  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
+  birim_fiyat DECIMAL(12,2) NOT NULL,
+  maliyet_birim DECIMAL(12,2) NOT NULL DEFAULT 0,
+  toplam DECIMAL(14,2) NOT NULL,
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih),
+  FOREIGN KEY (sale_item_id) REFERENCES sale_items(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS supplier_returns (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  book_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  tedarikci VARCHAR(200) NOT NULL,
+  adet INT NOT NULL,
+  koli DECIMAL(10,2) NOT NULL DEFAULT 0,
+  birim_fiyat DECIMAL(12,2) NOT NULL,
+  toplam DECIMAL(14,2) NOT NULL,
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih),
   FOREIGN KEY (book_id) REFERENCES books(id)
 ) ENGINE=InnoDB;
 
@@ -86,6 +113,46 @@ CREATE TABLE IF NOT EXISTS payments (
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
   KEY (tarih),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tarih DATE NOT NULL,
+  kategori VARCHAR(100) NOT NULL,
+  tutar DECIMAL(14,2) NOT NULL,
+  yontem VARCHAR(40) NOT NULL DEFAULT 'Nakit',
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS donations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tarih DATE NOT NULL,
+  bagisci VARCHAR(200) NOT NULL DEFAULT '',
+  tutar DECIMAL(14,2) NOT NULL,
+  yontem VARCHAR(40) NOT NULL DEFAULT 'Nakit',
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS loans (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tarih DATE NOT NULL,
+  alacakli VARCHAR(200) NOT NULL,
+  tutar DECIMAL(14,2) NOT NULL,
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS loan_payments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  loan_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  tutar DECIMAL(14,2) NOT NULL,
+  yontem VARCHAR(40) NOT NULL DEFAULT 'Nakit',
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (tarih),
+  FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS notification_log (
