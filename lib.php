@@ -4,7 +4,7 @@ declare(strict_types=1);
 function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; return $c[$k] ?? null; }
 
 function sqlite_upgrade(PDO $pdo): void {
-    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 3) return;
+    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 5) return;
 
     $pdo->exec('BEGIN IMMEDIATE');
     try {
@@ -46,6 +46,21 @@ function sqlite_upgrade(PDO $pdo): void {
             )");
             $pdo->exec('CREATE INDEX IF NOT EXISTS stock_out_returns_out ON stock_out_returns(stock_out_id)');
             $pdo->exec('PRAGMA user_version = 3');
+        }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 4) {
+            $pdo->exec('CREATE TABLE IF NOT EXISTS supplier_purchases (stock_in_id INTEGER PRIMARY KEY REFERENCES stock_in(id), total_cents INTEGER NOT NULL, due_date TEXT NOT NULL)');
+            $pdo->exec("CREATE TABLE IF NOT EXISTS supplier_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, stock_in_id INTEGER NOT NULL REFERENCES supplier_purchases(stock_in_id), tarih TEXT NOT NULL, amount_cents INTEGER NOT NULL, yontem TEXT NOT NULL, aciklama TEXT NOT NULL DEFAULT '')");
+            $pdo->exec('CREATE INDEX IF NOT EXISTS supplier_payments_in ON supplier_payments(stock_in_id)');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS supplier_return_links (return_id INTEGER PRIMARY KEY REFERENCES supplier_returns(id), stock_in_id INTEGER NOT NULL REFERENCES stock_in(id))');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS supplier_return_links_in ON supplier_return_links(stock_in_id)');
+            $pdo->exec('PRAGMA user_version = 4');
+        }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 5) {
+            $pdo->exec('CREATE TABLE IF NOT EXISTS sale_deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_item_id INTEGER NOT NULL REFERENCES sale_items(id), tarih TEXT NOT NULL, adet INTEGER NOT NULL, goturen_kisi TEXT NOT NULL, teslim_edilen TEXT NOT NULL)');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS sale_deliveries_item ON sale_deliveries(sale_item_id)');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS legacy_sale_returns (sale_item_id INTEGER PRIMARY KEY REFERENCES sale_items(id), adet INTEGER NOT NULL)');
+            $pdo->exec('INSERT OR IGNORE INTO legacy_sale_returns (sale_item_id, adet) SELECT sale_item_id, SUM(adet) FROM customer_returns GROUP BY sale_item_id');
+            $pdo->exec('PRAGMA user_version = 5');
         }
         $pdo->exec('COMMIT');
     } catch (Throwable $e) {
@@ -126,6 +141,42 @@ function dec(string $s): float { // "1.234,50" veya "1234.50"
     $s = trim($s);
     if (str_contains($s, ',')) $s = str_replace(['.', ','], ['', '.'], $s);
     return (float) $s;
+}
+function amount_cents(string $value): int {
+    $value = trim($value);
+    if (str_contains($value, ',')) {
+        if (!preg_match('/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/', $value)) throw new DomainException('Geçerli bir tutar girin.');
+        $value = str_replace(['.', ','], ['', '.'], $value);
+    }
+    if (!preg_match('/^(\d{1,10})(?:\.(\d{1,2}))?$/', $value, $parts)) throw new DomainException('Geçerli bir tutar girin.');
+    $cents = (int) $parts[1] * 100 + (int) str_pad($parts[2] ?? '', 2, '0');
+    if ($cents <= 0) throw new DomainException('Tutar sıfırdan büyük olmalıdır.');
+    return $cents;
+}
+function valid_date(string $value): string {
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    if (!$date || $date->format('Y-m-d') !== $value) throw new DomainException('Geçerli bir tarih girin.');
+    return $value;
+}
+function supplier_purchase_rows(): array {
+    return rows('SELECT i.id, i.tarih, i.adet, b.kod, b.ad kitap, p.total_cents, p.due_date,
+        COALESCE(pay.amount_cents,0) paid_cents, COALESCE(ret.return_cents,0) return_cents,
+        COALESCE(ret.units,0) returned_units
+        FROM stock_in i JOIN books b ON b.id = i.book_id
+        LEFT JOIN supplier_purchases p ON p.stock_in_id = i.id
+        LEFT JOIN (SELECT stock_in_id, SUM(amount_cents) amount_cents FROM supplier_payments GROUP BY stock_in_id) pay ON pay.stock_in_id = i.id
+        LEFT JOIN (SELECT l.stock_in_id, SUM(r.adet) units, SUM(ROUND(r.toplam * 100)) return_cents FROM supplier_return_links l JOIN supplier_returns r ON r.id = l.return_id GROUP BY l.stock_in_id) ret ON ret.stock_in_id = i.id
+        ORDER BY i.tarih DESC, i.id DESC');
+}
+function supplier_balance_summary(): array {
+    $debt = 0; $credit = 0;
+    foreach (supplier_purchase_rows() as $p) {
+        if ($p['total_cents'] === null) continue;
+        $balance = (int) $p['total_cents'] - (int) $p['paid_cents'] - (int) $p['return_cents'];
+        $debt += max(0, $balance);
+        $credit += max(0, -$balance);
+    }
+    return ['debt' => $debt / 100, 'credit' => $credit / 100];
 }
 function redirect(string $url): never { header('Location: ' . $url); exit; }
 
@@ -407,6 +458,9 @@ function export_sets(): array {
     $stockIn = rows('SELECT i.tarih, b.kod, b.ad kitap, i.adet, i.teslim_alan, i.aciklama FROM stock_in i JOIN books b ON b.id = i.book_id ORDER BY i.tarih, i.id');
     $stockOut = rows('SELECT o.tarih, b.kod, b.ad kitap, c.ad musteri, o.goturen_kisi, o.adet, o.aciklama
         FROM stock_out o JOIN books b ON b.id = o.book_id JOIN customers c ON c.id = o.customer_id ORDER BY o.tarih, o.id');
+    $deliveries = rows('SELECT d.tarih, s.id satis_no, c.ad musteri, b.kod, b.ad kitap, d.adet, d.goturen_kisi, d.teslim_edilen
+        FROM sale_deliveries d JOIN sale_items si ON si.id = d.sale_item_id JOIN sales s ON s.id = si.sale_id
+        JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY d.tarih, d.id');
     $customerReturns = rows('SELECT cr.tarih, s.id satis_no, c.ad musteri, b.kod, b.ad kitap, cr.adet, cr.toplam, cr.aciklama FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY cr.tarih, cr.id');
     $stockReturns = rows('SELECT r.tarih, o.id cikis_no, c.ad musteri, b.kod, b.ad kitap, r.adet, r.aciklama FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id JOIN customers c ON c.id = o.customer_id JOIN books b ON b.id = o.book_id ORDER BY r.tarih, r.id');
     $supplierReturns = rows('SELECT r.tarih, r.tedarikci, b.kod, b.ad kitap, r.adet, r.toplam, r.aciklama FROM supplier_returns r JOIN books b ON b.id = r.book_id ORDER BY r.tarih, r.id');
@@ -414,12 +468,20 @@ function export_sets(): array {
     $donations = rows('SELECT tarih, bagisci, tutar, yontem, aciklama FROM donations ORDER BY tarih, id');
     $loans = rows('SELECT l.tarih, l.alacakli, l.tutar, COALESCE(p.tutar,0) odenen, l.tutar - COALESCE(p.tutar,0) kalan, l.aciklama FROM loans l LEFT JOIN (SELECT loan_id, SUM(tutar) tutar FROM loan_payments GROUP BY loan_id) p ON p.loan_id = l.id ORDER BY l.tarih, l.id');
     $loanPayments = rows('SELECT p.tarih, l.alacakli, p.tutar, p.yontem, p.aciklama FROM loan_payments p JOIN loans l ON l.id = p.loan_id ORDER BY p.tarih, p.id');
+    $supplierPurchases = [];
+    foreach (supplier_purchase_rows() as $p) {
+        if ($p['total_cents'] === null) continue;
+        $balance = (int) $p['total_cents'] - (int) $p['paid_cents'] - (int) $p['return_cents'];
+        $supplierPurchases[] = [$p['id'], $p['tarih'], $p['kod'], $p['kitap'], $p['due_date'], $p['total_cents'] / 100, $p['paid_cents'] / 100, $p['return_cents'] / 100, max(0, $balance) / 100, max(0, -$balance) / 100];
+    }
+    $supplierPayments = rows('SELECT tarih, stock_in_id, amount_cents / 100.0 tutar, yontem, aciklama FROM supplier_payments ORDER BY tarih, id');
     $profitLoss = financial_summary();
     return [
         'Kitaplar' => [['Kod', 'Kitap Adı', 'Alış Fiyatı', 'Satış Fiyatı', 'Kritik Stok'], $books],
         'Müşteriler' => [['No', 'Tip', 'Ad', 'İl', 'İlçe', 'Yetkili', 'Telefon', 'E-posta', 'Adres'], $cust],
         'Stok Girişleri' => [['Tarih', 'Kod', 'Kitap', 'Adet', 'Teslim Alan', 'Açıklama'], $stockIn],
         'Stok Çıkışları' => [['Tarih', 'Kod', 'Kitap', 'Müşteri', 'Götüren Kişi', 'Adet', 'Açıklama'], $stockOut],
+        'Satış Teslimatları' => [['Tarih', 'Satış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Götüren', 'Teslim Edilen'], $deliveries],
         'Müşteri İadeleri' => [['Tarih', 'Satış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Tutar', 'Açıklama'], $customerReturns],
         'Stok Çıkış İadeleri' => [['Tarih', 'Çıkış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Açıklama'], $stockReturns],
         'Tedarikçi İadeleri' => [['Tarih', 'Tedarikçi', 'Kod', 'Kitap', 'Adet', 'Tutar', 'Açıklama'], $supplierReturns],
@@ -427,6 +489,8 @@ function export_sets(): array {
         'Bağışlar' => [['Tarih', 'Bağışçı', 'Tutar', 'Yöntem', 'Açıklama'], $donations],
         'Alınan Borçlar' => [['Tarih', 'Alacaklı', 'Alınan Borç', 'Ödenen', 'Kalan', 'Açıklama'], $loans],
         'Borç Ödemeleri' => [['Tarih', 'Alacaklı', 'Tutar', 'Yöntem', 'Açıklama'], $loanPayments],
+        'Tedarikçi Borçları' => [['Giriş No', 'Tarih', 'Kod', 'Kitap', 'Vade', 'Alış', 'Ödenen', 'İade', 'Borç', 'Alacak'], $supplierPurchases],
+        'Tedarikçi Ödemeleri' => [['Tarih', 'Giriş No', 'Tutar', 'Yöntem', 'Açıklama'], $supplierPayments],
         'Kâr Zarar' => [['Satışlar', 'Müşteri İadeleri', 'Net Satış', 'Kitap Maliyeti', 'Giderler', 'Bağışlar', 'Net Kâr/Zarar', 'Kalan Borç'], [[
             $profitLoss['sales'], $profitLoss['returns'], $profitLoss['net_sales'], $profitLoss['cost'], $profitLoss['expenses'], $profitLoss['donations'], $profitLoss['profit'], $profitLoss['debt'],
         ]]],
@@ -671,14 +735,22 @@ function send_weekly_reminders(): array {
 /* ---------------- Düzen ---------------- */
 
 function layout_head(string $title, string $page): void {
-    $menu = ['dashboard' => '📊 Panel', 'books' => '📚 Kitaplar', 'stock_in' => 'Stok Girişi', 'stock_out' => 'Stok Çıkışı',
-        'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri', 'people' => 'Kişiler',
-        'sales' => '🚚 Satışlar', 'returns_customer' => 'Müşteri İadesi', 'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi',
-        'customers' => '🏫 Müşteriler', 'payments' => '💰 Tahsilat', 'cari' => '🧾 Cari / Ekstre', 'overdue' => '⏰ Vadeli Alacak',
-        'expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'finance' => 'Kâr / Zarar',
-        'notifications' => '🔔 Bildirimler', 'reports' => '📋 Raporlar', 'export' => '📤 Excel / Sheets'];
-    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print"><b class="brand">📚 Kitap Cari</b><div class="nav-links">';
-    foreach ($menu as $k => $v) echo '<a href="?p=' . $k . '"' . ($k === $page ? ' class="on"' : '') . '>' . $v . '</a>';
+    $groups = [
+        'Stok' => ['books' => 'Kitaplar', 'stock_in' => 'Stok Girişi', 'stock_out' => 'Satış Teslimatı',
+            'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri', 'people' => 'Kişiler'],
+        'Satış ve İade' => ['sales' => 'Satışlar', 'returns_customer' => 'Müşteri İadesi',
+            'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi'],
+        'Müşteriler' => ['customers' => 'Müşteri Kartları', 'payments' => 'Tahsilat', 'cari' => 'Cari / Ekstre', 'overdue' => 'Vadeli Alacak'],
+        'Finans' => ['expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'finance' => 'Kâr / Zarar'],
+        'Diğer' => ['notifications' => 'Bildirimler', 'reports' => 'Raporlar', 'export' => 'Excel / Sheets'],
+    ];
+    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><b class="brand">📚 Kitap Cari</b><div class="nav-groups">';
+    echo '<a href="?p=dashboard"' . ($page === 'dashboard' ? ' class="on" aria-current="page"' : '') . '>Panel</a>';
+    foreach ($groups as $label => $items) {
+        echo '<details class="nav-menu"><summary' . (isset($items[$page]) ? ' class="on"' : '') . '>' . h($label) . '</summary><div class="nav-links">';
+        foreach ($items as $k => $v) echo '<a href="?p=' . $k . '"' . ($k === $page ? ' class="on" aria-current="page"' : '') . '>' . h($v) . '</a>';
+        echo '</div></details>';
+    }
     echo '</div><a href="?p=logout" class="out">Çıkış</a></nav><main>';
     if ($m = flash()) echo '<div class="flash">' . h($m) . '</div>';
     echo '<h1>' . h($title) . '</h1>';

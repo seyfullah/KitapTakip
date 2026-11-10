@@ -10,6 +10,18 @@
   const collator = new Intl.Collator('tr', {numeric: true, sensitivity: 'base'});
 
   document.addEventListener('DOMContentLoaded', () => {
+    const menus = [...document.querySelectorAll('.nav-menu')];
+    menus.forEach(menu => menu.addEventListener('toggle', () => {
+      if (menu.open) menus.forEach(other => { if (other !== menu) other.open = false; });
+    }));
+    document.addEventListener('click', event => {
+      if (!event.target.closest('nav')) menus.forEach(menu => { menu.open = false; });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      const open = menus.find(menu => menu.open);
+      if (open) { open.open = false; open.querySelector('summary').focus(); }
+    });
     const normalize = text => text.toLocaleLowerCase('tr-TR').trim();
     document.querySelectorAll('.person-select').forEach(select => {
       const label = document.createElement('label');

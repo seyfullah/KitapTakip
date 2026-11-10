@@ -2,8 +2,9 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('act') === 'delete') {
         $id = (int) post('id');
-        if ((int) val('SELECT COUNT(*) FROM customer_returns WHERE sale_item_id IN (SELECT id FROM sale_items WHERE sale_id = ?)', [$id])) {
-            flash('İadesi bulunan satış silinemez; önce iade kaydını gözden geçirin.');
+        if ((int) val('SELECT COUNT(*) FROM customer_returns WHERE sale_item_id IN (SELECT id FROM sale_items WHERE sale_id = ?)', [$id])
+            || (int) val('SELECT COUNT(*) FROM sale_deliveries WHERE sale_item_id IN (SELECT id FROM sale_items WHERE sale_id = ?)', [$id])) {
+            flash('İadesi veya teslimatı bulunan satış silinemez.');
         } else {
             q('DELETE FROM sales WHERE id = ?', [$id]);
             flash('Satış silindi, stok geri eklendi.'); after_write();
@@ -61,9 +62,9 @@ foreach ($books as $b) $opts .= '<option value="' . $b['id'] . '" data-fiyat="' 
     <label>veya Vade Tarihi<input type="date" name="vade_tarihi"></label>
     <label>Açıklama<input name="aciklama"></label>
   </div>
-  <table class="lines"><thead><tr><th>Kitap</th><th>Adet</th><th>Birim Fiyat</th><th>Tutar</th></tr></thead><tbody>
+  <div class="table-wrap"><table class="lines"><thead><tr><th>Kitap</th><th>Adet</th><th>Birim Fiyat</th><th>Tutar</th></tr></thead><tbody>
   <?php for ($i = 0; $i < 6; $i++) echo '<tr><td><select name="book_id[]" class="bk">' . $opts . '</select></td><td><input type="number" min="0" name="adet[]" class="ad"></td><td><input name="fiyat[]" class="fy" inputmode="decimal"></td><td class="r tt">0,00</td></tr>'; ?>
-  </tbody><tfoot><tr class="tot"><td colspan="3">Genel Toplam</td><td class="r" id="gt">0,00 TL</td></tr></tfoot></table>
+  </tbody><tfoot><tr class="tot"><td colspan="3">Genel Toplam</td><td class="r" id="gt">0,00 TL</td></tr></tfoot></table></div>
   <p class="muted">Fiyat boşsa kitap kartındaki satış fiyatı kullanılır.</p>
   <button>Satışı Kaydet</button>
 </form>

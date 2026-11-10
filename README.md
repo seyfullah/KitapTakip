@@ -12,9 +12,12 @@ PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulamas
 - Yazdırılabilir ekstre ve çok sekmeli Excel (`.xlsx`) dışa aktarımı
 - Google Sheets'e elle veya cron ile veri aktarımı
 - Mobil uyumlu modern arayüz; listelerde arama ve sütun başlığına tıklayarak sıralama
-- Yönetilebilir ortak kişi listesi; stok girişinde teslim alan, stok çıkışında götüren kişi seçimi
+- Üst menüde stok, satış ve iade, müşteriler, finans ve diğer işlemler için alt menüler
+- Yönetilebilir ortak kişi listesi; stok girişinde teslim alan ve satış teslimatında götüren kişi seçimi
+- Satış kalemleri için kısmi teslimat; teslim tarihi ve müşteri tarafındaki teslim alan kaydı
 - Satış, stok çıkışı ve tedarikçi iadeleri; stok ve ilgili müşteri bakiyesi güncellemesi
 - Gider, bağış ve alınan borç/borç ödemesi kayıtları ile kâr-zarar özeti
+- Stok girişine bağlı alış tutarı, vade, tedarikçi ödemeleri ve iade fazlası alacak takibi
 - Panelde "en çok satış yapılan" ve "en yüksek alacaklı" müşteri listeleri
 - Her Pazartesi 08.00'de alacaklı müşterilere e-posta ve SMS hatırlatması
 
@@ -119,6 +122,9 @@ Mevcut kurulumda yeni tabloları oluşturmak için `php install.php` komutunu me
 ## Veri ve hesaplama notları
 
 - Güncel stok = stok girişleri + satış ve stok çıkışı iadeleri − satışlar − stok çıkışları − tedarikçi iadeleri. Satış dışı çıkış iadeleri cari bakiyeyi ve kâr/zararı değiştirmez. Yetersiz stokta çıkış ve satış reddedilir.
+- Satış kaydı stoğu ayırır; sonradan kaydedilen kısmi teslimatlar stoğu ikinci kez azaltmaz. Teslimat takibi öncesindeki satışlar teslim edilmemiş kabul edilir, eski satış iadeleri teslim edilebilir miktardan düşülür. Yeni satış iadeleri yalnızca teslim edilmiş adetler için kaydedilir. Önceden kaydedilmiş bağımsız stok çıkışları ve iadeleri ayrıca korunur.
+- Her yeni stok girişinde toplam alış tutarı ve vade girilir. Önceki girişler için bu bilgiler **Finans → Tedarikçi Ödemeleri** ekranından eklenebilir. Eski tedarikçi iadeleri ve ödemeleri girişlerle otomatik eşleştirilmez; yeni iadeler seçilen girişin toplam alış tutarı üzerinden orantılı hesaplanır. Önceden yapılmış iadeler yeni iade miktarı kontrolünde yer almaz; eski kayıtları kontrol edin.
+- Tedarikçi ödemeleri ve alınan borçların anapara ödemeleri kâr/zararı doğrudan değiştirmez. İade, ilgili alışın borcundan düşülür; ödenmiş tutarı aşan iade tedarikçiden alacak olarak gösterilir.
 - Satışta fiyat boş bırakılırsa kitap kartındaki satış fiyatı kullanılır.
 - Tahsilatlar, müşteri bazında en eski satışlardan başlayarak FIFO yöntemiyle mahsup edilir. Bu nedenle vadesi geçmiş raporu tahsilatı belirli bir faturaya elle bağlamaz.
 - Tutar girişlerinde `1234,50` veya `1234.50` kullanılabilir.

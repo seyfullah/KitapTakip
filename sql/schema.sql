@@ -29,6 +29,23 @@ CREATE TABLE IF NOT EXISTS stock_in (
   FOREIGN KEY (book_id) REFERENCES books(id)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS supplier_purchases (
+  stock_in_id INT PRIMARY KEY,
+  total_cents BIGINT NOT NULL,
+  due_date DATE NOT NULL,
+  FOREIGN KEY (stock_in_id) REFERENCES stock_in(id)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS supplier_payments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  stock_in_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  yontem VARCHAR(40) NOT NULL,
+  aciklama VARCHAR(255) NOT NULL DEFAULT '',
+  KEY (stock_in_id),
+  FOREIGN KEY (stock_in_id) REFERENCES supplier_purchases(stock_in_id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS customers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tip ENUM('Okul','Kırtasiye') NOT NULL DEFAULT 'Okul',
@@ -88,6 +105,22 @@ CREATE TABLE IF NOT EXISTS sale_items (
   FOREIGN KEY (book_id) REFERENCES books(id)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS sale_deliveries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sale_item_id INT NOT NULL,
+  tarih DATE NOT NULL,
+  adet INT NOT NULL,
+  goturen_kisi VARCHAR(120) NOT NULL,
+  teslim_edilen VARCHAR(200) NOT NULL,
+  KEY (sale_item_id),
+  FOREIGN KEY (sale_item_id) REFERENCES sale_items(id)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS legacy_sale_returns (
+  sale_item_id INT PRIMARY KEY,
+  adet INT NOT NULL,
+  FOREIGN KEY (sale_item_id) REFERENCES sale_items(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS customer_returns (
   id INT AUTO_INCREMENT PRIMARY KEY,
   sale_item_id INT NOT NULL,
@@ -112,6 +145,14 @@ CREATE TABLE IF NOT EXISTS supplier_returns (
   aciklama VARCHAR(255) NOT NULL DEFAULT '',
   KEY (tarih),
   FOREIGN KEY (book_id) REFERENCES books(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS supplier_return_links (
+  return_id INT PRIMARY KEY,
+  stock_in_id INT NOT NULL,
+  KEY (stock_in_id),
+  FOREIGN KEY (return_id) REFERENCES supplier_returns(id),
+  FOREIGN KEY (stock_in_id) REFERENCES stock_in(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS payments (
@@ -207,6 +248,12 @@ INSERT IGNORE INTO people (ad)
   SELECT TRIM(goturen_kisi) FROM stock_out
   WHERE TRIM(goturen_kisi) <> '' AND NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = 'people_from_stock');
 INSERT IGNORE INTO schema_migrations (name) VALUES ('people_from_stock');
+
+INSERT IGNORE INTO legacy_sale_returns (sale_item_id, adet)
+  SELECT sale_item_id, SUM(adet) FROM customer_returns
+  WHERE NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = 'legacy_sale_returns')
+  GROUP BY sale_item_id;
+INSERT IGNORE INTO schema_migrations (name) VALUES ('legacy_sale_returns');
 
 SET @migration_sql = IF((SELECT COUNT(*) FROM information_schema.columns
   WHERE table_schema = DATABASE() AND table_name = 'books' AND column_name = 'koli_adedi') > 0,

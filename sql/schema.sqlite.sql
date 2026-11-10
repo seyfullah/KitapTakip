@@ -30,6 +30,21 @@ CREATE TABLE IF NOT EXISTS stock_in (
   aciklama TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS supplier_purchases (
+  stock_in_id INTEGER PRIMARY KEY REFERENCES stock_in(id),
+  total_cents INTEGER NOT NULL,
+  due_date TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS supplier_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stock_in_id INTEGER NOT NULL REFERENCES supplier_purchases(stock_in_id),
+  tarih TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  yontem TEXT NOT NULL,
+  aciklama TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS supplier_payments_in ON supplier_payments(stock_in_id);
+
 CREATE TABLE IF NOT EXISTS customers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tip TEXT NOT NULL DEFAULT 'Okul' CHECK(tip IN ('Okul','Kırtasiye')),
@@ -85,6 +100,20 @@ CREATE TABLE IF NOT EXISTS sale_items (
   toplam NUMERIC NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sale_deliveries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
+  tarih TEXT NOT NULL,
+  adet INTEGER NOT NULL,
+  goturen_kisi TEXT NOT NULL,
+  teslim_edilen TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sale_deliveries_item ON sale_deliveries(sale_item_id);
+CREATE TABLE IF NOT EXISTS legacy_sale_returns (
+  sale_item_id INTEGER PRIMARY KEY REFERENCES sale_items(id),
+  adet INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS customer_returns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
@@ -108,6 +137,12 @@ CREATE TABLE IF NOT EXISTS supplier_returns (
   aciklama TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS supplier_returns_tarih ON supplier_returns(tarih);
+
+CREATE TABLE IF NOT EXISTS supplier_return_links (
+  return_id INTEGER PRIMARY KEY REFERENCES supplier_returns(id),
+  stock_in_id INTEGER NOT NULL REFERENCES stock_in(id)
+);
+CREATE INDEX IF NOT EXISTS supplier_return_links_in ON supplier_return_links(stock_in_id);
 
 CREATE TABLE IF NOT EXISTS payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

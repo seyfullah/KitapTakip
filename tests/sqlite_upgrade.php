@@ -31,7 +31,7 @@ try {
         if (!$ok) throw new RuntimeException($message);
     };
 
-    $check((int) $pdo->query('PRAGMA user_version')->fetchColumn() === 3, 'Şema sürümü güncellenmedi.');
+    $check((int) $pdo->query('PRAGMA user_version')->fetchColumn() === 5, 'Şema sürümü güncellenmedi.');
     $check(count(stock_report()) === 1 && book_stock(1) === 17, 'Mevcut stok korunmadı.');
     $check((float) val('SELECT maliyet_birim FROM sale_items WHERE id = 1') === 5.0, 'Satış maliyeti doldurulmadı.');
     $old = row('SELECT alan_kisi, teslim_yeri FROM stock_out WHERE id = 1');
@@ -73,6 +73,23 @@ try {
     $sets = export_sets();
     $check(count($sets['Stok Çıkış İadeleri'][1]) === 1, 'Stok çıkış iadesi dışa aktarılmadı.');
     $check((float) financial_summary()['profit'] === 10.0, 'Satış dışı iade kâr/zararı değiştirdi.');
+    $check(amount_cents('1.234,56') === 123456 && amount_cents('100.01') === 10001, 'Tutar dönüşümü hatalı.');
+    try { amount_cents('10.123'); throw new RuntimeException('Hatalı tutar kabul edildi.'); } catch (DomainException $e) {}
+    q('INSERT INTO supplier_purchases (stock_in_id, total_cents, due_date) VALUES (?,?,?)', [1, 10000, '2025-02-01']);
+    q('INSERT INTO supplier_payments (stock_in_id, tarih, amount_cents, yontem) VALUES (?,?,?,?)', [1, '2025-01-05', 8000, 'Nakit']);
+    q('INSERT INTO supplier_returns (book_id, tarih, tedarikci, adet, birim_fiyat, toplam, aciklama) VALUES (?,?,?,?,?,?,?)', [1, '2025-01-06', '', 1, 30, 30, '']);
+    q('INSERT INTO supplier_return_links (return_id, stock_in_id) VALUES (?,?)', [(int) $pdo->lastInsertId(), 1]);
+    $supplier = supplier_balance_summary();
+    $check($supplier['debt'] === 0 && $supplier['credit'] === 10, 'Tedarikçi iade alacağı hesaplanamadı.');
+    q('INSERT INTO customer_returns (sale_item_id, tarih, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?)', [1, '2025-01-06', 1, 10, 5, 10]);
+    $pdo->exec('PRAGMA user_version = 4');
+    sqlite_upgrade($pdo);
+    $check((int) val('SELECT adet FROM legacy_sale_returns WHERE sale_item_id = 1') === 1, 'Eski satış iadesi teslimat geçişinde korunmadı.');
+    $before = book_stock(1);
+    q('INSERT INTO sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)', [1, '2025-01-07', 1, 'Görevli', 'Alıcı']);
+    $check(book_stock(1) === $before, 'Satış teslimatı stoğu tekrar düşürdü.');
+    $sets = export_sets();
+    $check(count($sets['Satış Teslimatları'][1]) === 1 && count($sets['Tedarikçi Ödemeleri'][1]) === 1, 'Yeni hareketler dışa aktarılmadı.');
     echo "SQLite yükseltmesi ve eski veriler doğrulandı.\n";
 } finally {
     unlink($path);
