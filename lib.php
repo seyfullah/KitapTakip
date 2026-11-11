@@ -4,7 +4,7 @@ declare(strict_types=1);
 function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; return $c[$k] ?? null; }
 
 function sqlite_upgrade(PDO $pdo): void {
-    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 6) return;
+    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 7) return;
 
     $pdo->exec('BEGIN IMMEDIATE');
     try {
@@ -65,6 +65,13 @@ function sqlite_upgrade(PDO $pdo): void {
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 6) {
             $pdo->exec('CREATE TABLE IF NOT EXISTS user_people (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, person_id INTEGER NOT NULL REFERENCES people(id))');
             $pdo->exec('PRAGMA user_version = 6');
+        }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 7) {
+            $columns = array_column($pdo->query("PRAGMA table_info(uy_sales)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+            if (!in_array('durum', $columns, true)) {
+                $pdo->exec("ALTER TABLE uy_sales ADD COLUMN durum TEXT NOT NULL DEFAULT 'Yeni'");
+            }
+            $pdo->exec('PRAGMA user_version = 7');
         }
         $pdo->exec('COMMIT');
     } catch (Throwable $e) {
@@ -186,6 +193,7 @@ function h($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
 function money($v): string { return number_format((float) $v, 2, ',', '.') . ' TL'; }
 function num($v): string { return number_format((float) $v, 0, ',', '.'); }
 function dtr(?string $d): string { return $d ? date('d.m.Y', strtotime($d)) : ''; }
+function fmt(float|int $n): string { return number_format((float)$n, 2, ',', '.'); }
 function post(string $k, string $d = ''): string { return trim((string) ($_POST[$k] ?? $d)); }
 function get(string $k, string $d = ''): string { return trim((string) ($_GET[$k] ?? $d)); }
 function dec(string $s): float { // "1.234,50" veya "1234.50"
