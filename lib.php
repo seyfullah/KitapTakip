@@ -108,9 +108,10 @@ function db(): PDO {
             }
             $pdo->exec('PRAGMA foreign_keys = ON');
             $pdo->exec('PRAGMA busy_timeout = 5000');
-            $pdo->sqliteCreateFunction('CONCAT', static fn(...$args) => implode('', array_map(static fn($v) => (string) ($v ?? ''), $args)));
-            $pdo->sqliteCreateFunction('IF', static fn($condition, $yes, $no) => $condition ? $yes : $no, 3);
-            $pdo->sqliteCreateFunction('DATE_FORMAT', static function ($date, $format) {
+            $sqliteCreateFunction = 'sqliteCreateFunction';
+            $pdo->{$sqliteCreateFunction}('CONCAT', static fn(...$args) => implode('', array_map(static fn($v) => (string) ($v ?? ''), $args)));
+            $pdo->{$sqliteCreateFunction}('IF', static fn($condition, $yes, $no) => $condition ? $yes : $no, 3);
+            $pdo->{$sqliteCreateFunction}('DATE_FORMAT', static function ($date, $format) {
                 $map = ['%Y' => 'Y', '%m' => 'm', '%d' => 'd'];
                 return date(strtr((string) $format, $map), strtotime((string) $date));
             }, 2);
@@ -621,7 +622,7 @@ function gs_request(string $method, string $url, ?array $body, string $token): a
     if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
     $res = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    unset($ch);
     $j = json_decode((string) $res, true) ?? [];
     if ($code >= 400) throw new RuntimeException('Google Sheets hatası (' . $code . '): ' . ($j['error']['message'] ?? $res));
     return $j;
@@ -640,7 +641,7 @@ function gs_token(): string {
     curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30,
         CURLOPT_POSTFIELDS => http_build_query(['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $in . '.' . b64url($sig)])]);
     $j = json_decode((string) curl_exec($ch), true);
-    curl_close($ch);
+    unset($ch);
     if (empty($j['access_token'])) throw new RuntimeException('Google token alınamadı: ' . ($j['error_description'] ?? 'bilinmeyen hata'));
     return $j['access_token'];
 }
@@ -730,7 +731,7 @@ function send_reminder_sms(array $customer, float $balance): void {
     $response = curl_exec($ch);
     $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
-    curl_close($ch);
+    unset($ch);
     if ($response === false) throw new RuntimeException('Twilio bağlantı hatası: ' . $curlError);
     $result = json_decode($response, true) ?? [];
     if ($status < 200 || $status >= 300) throw new RuntimeException('Twilio SMS hatası (' . $status . '): ' . ($result['message'] ?? 'sağlayıcı isteği reddetti'));
