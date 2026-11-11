@@ -10,18 +10,18 @@ function sqlite_upgrade(PDO $pdo): void {
     try {
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 1) {
             $columns = static fn(string $table): array => array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(PDO::FETCH_ASSOC), 'name');
-            $stockIn = $columns('stock_in');
+            $stockIn = $columns('uy_stock_in');
             if ($stockIn && !in_array('teslim_alan', $stockIn, true)) {
-                $pdo->exec("ALTER TABLE stock_in ADD COLUMN teslim_alan TEXT NOT NULL DEFAULT ''");
+                $pdo->exec("ALTER TABLE uy_stock_in ADD COLUMN teslim_alan TEXT NOT NULL DEFAULT ''");
             }
-            $stockOut = $columns('stock_out');
+            $stockOut = $columns('uy_stock_out');
             if ($stockOut && !in_array('goturen_kisi', $stockOut, true)) {
-                $pdo->exec("ALTER TABLE stock_out ADD COLUMN goturen_kisi TEXT NOT NULL DEFAULT ''");
+                $pdo->exec("ALTER TABLE uy_stock_out ADD COLUMN goturen_kisi TEXT NOT NULL DEFAULT ''");
             }
-            $saleItems = $columns('sale_items');
+            $saleItems = $columns('uy_sale_items');
             if ($saleItems && !in_array('maliyet_birim', $saleItems, true)) {
-                $pdo->exec('ALTER TABLE sale_items ADD COLUMN maliyet_birim NUMERIC NOT NULL DEFAULT 0');
-                $pdo->exec('UPDATE sale_items SET maliyet_birim = COALESCE((SELECT alis_fiyati FROM books WHERE books.id = sale_items.book_id), 0)');
+                $pdo->exec('ALTER TABLE uy_sale_items ADD COLUMN maliyet_birim NUMERIC NOT NULL DEFAULT 0');
+                $pdo->exec('UPDATE uy_sale_items SET maliyet_birim = COALESCE((SELECT alis_fiyati FROM uy_books WHERE uy_books.id = uy_sale_items.book_id), 0)');
             }
             $schema = file_get_contents(__DIR__ . '/sql/schema.sqlite.sql');
             if ($schema === false) throw new RuntimeException('SQLite şema dosyası okunamadı.');
@@ -29,37 +29,37 @@ function sqlite_upgrade(PDO $pdo): void {
             $pdo->exec('PRAGMA user_version = 1');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 2) {
-            $pdo->exec('CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY AUTOINCREMENT, ad TEXT NOT NULL UNIQUE)');
-            $pdo->exec("INSERT OR IGNORE INTO people (ad) SELECT TRIM(teslim_alan) FROM stock_in WHERE TRIM(teslim_alan) <> ''");
-            $pdo->exec("INSERT OR IGNORE INTO people (ad) SELECT TRIM(goturen_kisi) FROM stock_out WHERE TRIM(goturen_kisi) <> ''");
-            foreach (['books' => 'koli_adedi', 'stock_out' => 'koli', 'sale_items' => 'koli'] as $table => $column) {
+            $pdo->exec('CREATE TABLE IF NOT EXISTS uy_people (id INTEGER PRIMARY KEY AUTOINCREMENT, ad TEXT NOT NULL UNIQUE)');
+            $pdo->exec("INSERT OR IGNORE INTO uy_people (ad) SELECT TRIM(teslim_alan) FROM uy_stock_in WHERE TRIM(teslim_alan) <> ''");
+            $pdo->exec("INSERT OR IGNORE INTO uy_people (ad) SELECT TRIM(goturen_kisi) FROM uy_stock_out WHERE TRIM(goturen_kisi) <> ''");
+            foreach (['uy_books' => 'koli_adedi', 'uy_stock_out' => 'koli', 'uy_sale_items' => 'koli'] as $table => $column) {
                 $columns = array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(PDO::FETCH_ASSOC), 'name');
                 if (in_array($column, $columns, true)) $pdo->exec("ALTER TABLE $table DROP COLUMN $column");
             }
             $pdo->exec('PRAGMA user_version = 2');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 3) {
-            $pdo->exec("CREATE TABLE IF NOT EXISTS stock_out_returns (
+            $pdo->exec("CREATE TABLE IF NOT EXISTS uy_stock_out_returns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                stock_out_id INTEGER NOT NULL REFERENCES stock_out(id),
+                stock_out_id INTEGER NOT NULL REFERENCES uy_stock_out(id),
                 tarih TEXT NOT NULL, adet INTEGER NOT NULL, aciklama TEXT NOT NULL DEFAULT ''
             )");
-            $pdo->exec('CREATE INDEX IF NOT EXISTS stock_out_returns_out ON stock_out_returns(stock_out_id)');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS stock_out_returns_out ON uy_stock_out_returns(stock_out_id)');
             $pdo->exec('PRAGMA user_version = 3');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 4) {
-            $pdo->exec('CREATE TABLE IF NOT EXISTS supplier_purchases (stock_in_id INTEGER PRIMARY KEY REFERENCES stock_in(id), total_cents INTEGER NOT NULL, due_date TEXT NOT NULL)');
-            $pdo->exec("CREATE TABLE IF NOT EXISTS supplier_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, stock_in_id INTEGER NOT NULL REFERENCES supplier_purchases(stock_in_id), tarih TEXT NOT NULL, amount_cents INTEGER NOT NULL, yontem TEXT NOT NULL, aciklama TEXT NOT NULL DEFAULT '')");
-            $pdo->exec('CREATE INDEX IF NOT EXISTS supplier_payments_in ON supplier_payments(stock_in_id)');
-            $pdo->exec('CREATE TABLE IF NOT EXISTS supplier_return_links (return_id INTEGER PRIMARY KEY REFERENCES supplier_returns(id), stock_in_id INTEGER NOT NULL REFERENCES stock_in(id))');
-            $pdo->exec('CREATE INDEX IF NOT EXISTS supplier_return_links_in ON supplier_return_links(stock_in_id)');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS uy_supplier_purchases (stock_in_id INTEGER PRIMARY KEY REFERENCES uy_stock_in(id), total_cents INTEGER NOT NULL, due_date TEXT NOT NULL)');
+            $pdo->exec("CREATE TABLE IF NOT EXISTS uy_supplier_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, stock_in_id INTEGER NOT NULL REFERENCES uy_supplier_purchases(stock_in_id), tarih TEXT NOT NULL, amount_cents INTEGER NOT NULL, yontem TEXT NOT NULL, aciklama TEXT NOT NULL DEFAULT '')");
+            $pdo->exec('CREATE INDEX IF NOT EXISTS supplier_payments_in ON uy_supplier_payments(stock_in_id)');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS uy_supplier_return_links (return_id INTEGER PRIMARY KEY REFERENCES uy_supplier_returns(id), stock_in_id INTEGER NOT NULL REFERENCES uy_stock_in(id))');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS supplier_return_links_in ON uy_supplier_return_links(stock_in_id)');
             $pdo->exec('PRAGMA user_version = 4');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 5) {
-            $pdo->exec('CREATE TABLE IF NOT EXISTS sale_deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_item_id INTEGER NOT NULL REFERENCES sale_items(id), tarih TEXT NOT NULL, adet INTEGER NOT NULL, goturen_kisi TEXT NOT NULL, teslim_edilen TEXT NOT NULL)');
-            $pdo->exec('CREATE INDEX IF NOT EXISTS sale_deliveries_item ON sale_deliveries(sale_item_id)');
-            $pdo->exec('CREATE TABLE IF NOT EXISTS legacy_sale_returns (sale_item_id INTEGER PRIMARY KEY REFERENCES sale_items(id), adet INTEGER NOT NULL)');
-            $pdo->exec('INSERT OR IGNORE INTO legacy_sale_returns (sale_item_id, adet) SELECT sale_item_id, SUM(adet) FROM customer_returns GROUP BY sale_item_id');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS uy_sale_deliveries (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_item_id INTEGER NOT NULL REFERENCES uy_sale_items(id), tarih TEXT NOT NULL, adet INTEGER NOT NULL, goturen_kisi TEXT NOT NULL, teslim_edilen TEXT NOT NULL)');
+            $pdo->exec('CREATE INDEX IF NOT EXISTS sale_deliveries_item ON uy_sale_deliveries(sale_item_id)');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS uy_legacy_sale_returns (sale_item_id INTEGER PRIMARY KEY REFERENCES uy_sale_items(id), adet INTEGER NOT NULL)');
+            $pdo->exec('INSERT OR IGNORE INTO uy_legacy_sale_returns (sale_item_id, adet) SELECT sale_item_id, SUM(adet) FROM uy_customer_returns GROUP BY sale_item_id');
             $pdo->exec('PRAGMA user_version = 5');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 6) {
@@ -171,7 +171,7 @@ function insert_stock_out(int $bookId, int $customerId, string $date, int $units
     $fields = ['book_id', 'customer_id', 'tarih', 'adet', 'goturen_kisi', 'aciklama'];
     $values = [$bookId, $customerId, $date, $units, $carrier, $description];
     if (cfg('app_storage') === 'sqlite') {
-        $columns = array_column(db()->query('PRAGMA table_info(stock_out)')->fetchAll(), 'name');
+        $columns = array_column(db()->query('PRAGMA table_info(uy_stock_out)')->fetchAll(), 'name');
         foreach (['alan_kisi', 'teslim_yeri'] as $column) {
             if (in_array($column, $columns, true)) {
                 $fields[] = $column;
@@ -179,7 +179,7 @@ function insert_stock_out(int $bookId, int $customerId, string $date, int $units
             }
         }
     }
-    q('INSERT INTO stock_out (' . implode(', ', $fields) . ') VALUES (' . implode(', ', array_fill(0, count($fields), '?')) . ')', $values);
+    q('INSERT INTO uy_stock_out (' . implode(', ', $fields) . ') VALUES (' . implode(', ', array_fill(0, count($fields), '?')) . ')', $values);
 }
 
 function h($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); }
@@ -213,10 +213,10 @@ function supplier_purchase_rows(): array {
     return rows('SELECT i.id, i.tarih, i.adet, b.kod, b.ad kitap, p.total_cents, p.due_date,
         COALESCE(pay.amount_cents,0) paid_cents, COALESCE(ret.return_cents,0) return_cents,
         COALESCE(ret.units,0) returned_units
-        FROM stock_in i JOIN books b ON b.id = i.book_id
-        LEFT JOIN supplier_purchases p ON p.stock_in_id = i.id
-        LEFT JOIN (SELECT stock_in_id, SUM(amount_cents) amount_cents FROM supplier_payments GROUP BY stock_in_id) pay ON pay.stock_in_id = i.id
-        LEFT JOIN (SELECT l.stock_in_id, SUM(r.adet) units, SUM(ROUND(r.toplam * 100)) return_cents FROM supplier_return_links l JOIN supplier_returns r ON r.id = l.return_id GROUP BY l.stock_in_id) ret ON ret.stock_in_id = i.id
+        FROM uy_stock_in i JOIN uy_books b ON b.id = i.book_id
+        LEFT JOIN uy_supplier_purchases p ON p.stock_in_id = i.id
+        LEFT JOIN (SELECT stock_in_id, SUM(amount_cents) amount_cents FROM uy_supplier_payments GROUP BY stock_in_id) pay ON pay.stock_in_id = i.id
+        LEFT JOIN (SELECT l.stock_in_id, SUM(r.adet) units, SUM(ROUND(r.toplam * 100)) return_cents FROM uy_supplier_return_links l JOIN uy_supplier_returns r ON r.id = l.return_id GROUP BY l.stock_in_id) ret ON ret.stock_in_id = i.id
         ORDER BY i.tarih DESC, i.id DESC');
 }
 function supplier_balance_summary(): array {
@@ -250,12 +250,12 @@ function select(string $name, array $opts, $sel = '', string $extra = ''): strin
 }
 function book_opts(bool $blank = false): array {
     $o = $blank ? ['' => '— Seçiniz —'] : [];
-    foreach (rows('SELECT id, kod, ad FROM books ORDER BY ad') as $b) $o[$b['id']] = $b['kod'] . ' - ' . $b['ad'];
+    foreach (rows('SELECT id, kod, ad FROM uy_books ORDER BY ad') as $b) $o[$b['id']] = $b['kod'] . ' - ' . $b['ad'];
     return $o;
 }
 function customer_opts(bool $blank = false, string $tip = ''): array {
     $o = $blank ? ['' => '— Seçiniz —'] : [];
-    $sql = 'SELECT id, tip, ad FROM customers' . ($tip ? ' WHERE tip = ?' : '') . ' ORDER BY ad';
+    $sql = 'SELECT id, tip, ad FROM uy_customers' . ($tip ? ' WHERE tip = ?' : '') . ' ORDER BY ad';
     foreach (rows($sql, $tip ? [$tip] : []) as $c) $o[$c['id']] = $c['ad'] . ' (' . $c['tip'] . ')';
     return $o;
 }
@@ -275,23 +275,23 @@ function stock_report(): array {
         COALESCE(so.t,0) - COALESCE(sor.t,0) + COALESCE(sr.t,0) AS diger_cikis,
         COALESCE(si.t,0) + COALESCE(cr.t,0) + COALESCE(sor.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) - COALESCE(sr.t,0) AS stok,
         (COALESCE(si.t,0) + COALESCE(cr.t,0) + COALESCE(sor.t,0) - COALESCE(sa.t,0) - COALESCE(so.t,0) - COALESCE(sr.t,0)) * b.alis_fiyati AS stok_degeri
-        FROM books b
-        LEFT JOIN (SELECT book_id, SUM(adet) t FROM stock_in GROUP BY book_id) si ON si.book_id = b.id
-        LEFT JOIN (SELECT book_id, SUM(adet) t FROM sale_items GROUP BY book_id) sa ON sa.book_id = b.id
-        LEFT JOIN (SELECT book_id, SUM(adet) t FROM stock_out GROUP BY book_id) so ON so.book_id = b.id
-        LEFT JOIN (SELECT o.book_id, SUM(r.adet) t FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id GROUP BY o.book_id) sor ON sor.book_id = b.id
-        LEFT JOIN (SELECT si.book_id, SUM(cr.adet) t FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id GROUP BY si.book_id) cr ON cr.book_id = b.id
-        LEFT JOIN (SELECT book_id, SUM(adet) t FROM supplier_returns GROUP BY book_id) sr ON sr.book_id = b.id
+        FROM uy_books b
+        LEFT JOIN (SELECT book_id, SUM(adet) t FROM uy_stock_in GROUP BY book_id) si ON si.book_id = b.id
+        LEFT JOIN (SELECT book_id, SUM(adet) t FROM uy_sale_items GROUP BY book_id) sa ON sa.book_id = b.id
+        LEFT JOIN (SELECT book_id, SUM(adet) t FROM uy_stock_out GROUP BY book_id) so ON so.book_id = b.id
+        LEFT JOIN (SELECT o.book_id, SUM(r.adet) t FROM uy_stock_out_returns r JOIN uy_stock_out o ON o.id = r.stock_out_id GROUP BY o.book_id) sor ON sor.book_id = b.id
+        LEFT JOIN (SELECT si.book_id, SUM(cr.adet) t FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id GROUP BY si.book_id) cr ON cr.book_id = b.id
+        LEFT JOIN (SELECT book_id, SUM(adet) t FROM uy_supplier_returns GROUP BY book_id) sr ON sr.book_id = b.id
         ORDER BY b.ad");
 }
 function book_stock(int $bookId): int {
     $r = row('SELECT
-        (SELECT COALESCE(SUM(adet),0) FROM stock_in WHERE book_id = :b)
-        - (SELECT COALESCE(SUM(adet),0) FROM sale_items WHERE book_id = :b2)
-        - (SELECT COALESCE(SUM(adet),0) FROM stock_out WHERE book_id = :b3)
-        + (SELECT COALESCE(SUM(cr.adet),0) FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id WHERE si.book_id = :b4)
-        + (SELECT COALESCE(SUM(r.adet),0) FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id WHERE o.book_id = :b6)
-        - (SELECT COALESCE(SUM(adet),0) FROM supplier_returns WHERE book_id = :b5) s',
+        (SELECT COALESCE(SUM(adet),0) FROM uy_stock_in WHERE book_id = :b)
+        - (SELECT COALESCE(SUM(adet),0) FROM uy_sale_items WHERE book_id = :b2)
+        - (SELECT COALESCE(SUM(adet),0) FROM uy_stock_out WHERE book_id = :b3)
+        + (SELECT COALESCE(SUM(cr.adet),0) FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id WHERE si.book_id = :b4)
+        + (SELECT COALESCE(SUM(r.adet),0) FROM uy_stock_out_returns r JOIN uy_stock_out o ON o.id = r.stock_out_id WHERE o.book_id = :b6)
+        - (SELECT COALESCE(SUM(adet),0) FROM uy_supplier_returns WHERE book_id = :b5) s',
         ['b' => $bookId, 'b2' => $bookId, 'b3' => $bookId, 'b4' => $bookId, 'b5' => $bookId, 'b6' => $bookId]);
     return (int) $r['s'];
 }
@@ -306,10 +306,10 @@ function customer_balances(string $from = '', string $to = ''): array {
     return rows("SELECT c.id, c.tip, c.ad, c.il, c.ilce, c.telefon, c.eposta,
         COALESCE(s.t,0) - COALESCE(r.t,0) AS satis, COALESCE(p.t,0) AS tahsilat,
         COALESCE(s.t,0) - COALESCE(r.t,0) - COALESCE(p.t,0) AS kalan
-        FROM customers c
-        LEFT JOIN (SELECT customer_id, SUM(toplam) t FROM sales WHERE 1=1 $sw GROUP BY customer_id) s ON s.customer_id = c.id
-        LEFT JOIN (SELECT customer_id, SUM(tutar) t FROM payments WHERE 1=1 $pw GROUP BY customer_id) p ON p.customer_id = c.id
-        LEFT JOIN (SELECT s.customer_id, SUM(cr.toplam) t FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id JOIN sales s ON s.id = si.sale_id WHERE 1=1 $rw GROUP BY s.customer_id) r ON r.customer_id = c.id
+        FROM uy_customers c
+        LEFT JOIN (SELECT customer_id, SUM(toplam) t FROM uy_sales WHERE 1=1 $sw GROUP BY customer_id) s ON s.customer_id = c.id
+        LEFT JOIN (SELECT customer_id, SUM(tutar) t FROM uy_payments WHERE 1=1 $pw GROUP BY customer_id) p ON p.customer_id = c.id
+        LEFT JOIN (SELECT s.customer_id, SUM(cr.toplam) t FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id JOIN uy_sales s ON s.id = si.sale_id WHERE 1=1 $rw GROUP BY s.customer_id) r ON r.customer_id = c.id
         ORDER BY c.ad", $p);
 }
 
@@ -320,11 +320,11 @@ function customer_balances(string $from = '', string $to = ''): array {
 function overdue_rows(?int $customerId = null, ?string $today = null): array {
     $today ??= date('Y-m-d');
     $pay = [];
-    foreach (rows('SELECT customer_id, SUM(tutar) t FROM payments GROUP BY customer_id') as $r) $pay[$r['customer_id']] = (float) $r['t'];
+    foreach (rows('SELECT customer_id, SUM(tutar) t FROM uy_payments GROUP BY customer_id') as $r) $pay[$r['customer_id']] = (float) $r['t'];
     $sql = 'SELECT s.id, s.customer_id, c.ad, c.tip, c.telefon, s.tarih, s.vade_tarihi,
             s.toplam - COALESCE(r.t,0) AS toplam
-            FROM sales s JOIN customers c ON c.id = s.customer_id
-            LEFT JOIN (SELECT si.sale_id, SUM(cr.toplam) t FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id GROUP BY si.sale_id) r ON r.sale_id = s.id' .
+            FROM uy_sales s JOIN uy_customers c ON c.id = s.customer_id
+            LEFT JOIN (SELECT si.sale_id, SUM(cr.toplam) t FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id GROUP BY si.sale_id) r ON r.sale_id = s.id' .
             ($customerId ? ' WHERE s.customer_id = ' . (int) $customerId : '') . '
             ORDER BY s.customer_id, s.vade_tarihi, s.id';
     $out = []; $cur = null; $left = 0.0;
@@ -345,9 +345,9 @@ function overdue_rows(?int $customerId = null, ?string $today = null): array {
 
 /** Müşteri ekstresi: borç (satış) / alacak (tahsilat) hareketleri, yürüyen bakiye. */
 function statement(int $customerId, string $from = '', string $to = ''): array {
-    $mv = rows("SELECT tarih, 'Satış' AS tur, CONCAT('Satış #', id, IF(aciklama='','',CONCAT(' - ', aciklama))) AS aciklama, toplam AS borc, 0 AS alacak, id AS sira FROM sales WHERE customer_id = :c1
-        UNION ALL SELECT cr.tarih, 'İade', CONCAT('Satış #', s.id, IF(cr.aciklama='','',CONCAT(' - ', cr.aciklama))), 0, cr.toplam, cr.id FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id JOIN sales s ON s.id = si.sale_id WHERE s.customer_id = :c2
-        UNION ALL SELECT tarih, 'Tahsilat', CONCAT(yontem, IF(aciklama='','',CONCAT(' - ', aciklama))), 0, tutar, id FROM payments WHERE customer_id = :c3
+    $mv = rows("SELECT tarih, 'Satış' AS tur, CONCAT('Satış #', id, IF(aciklama='','',CONCAT(' - ', aciklama))) AS aciklama, toplam AS borc, 0 AS alacak, id AS sira FROM uy_sales WHERE customer_id = :c1
+        UNION ALL SELECT cr.tarih, 'İade', CONCAT('Satış #', s.id, IF(cr.aciklama='','',CONCAT(' - ', cr.aciklama))), 0, cr.toplam, cr.id FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id JOIN uy_sales s ON s.id = si.sale_id WHERE s.customer_id = :c2
+        UNION ALL SELECT tarih, 'Tahsilat', CONCAT(yontem, IF(aciklama='','',CONCAT(' - ', aciklama))), 0, tutar, id FROM uy_payments WHERE customer_id = :c3
         ORDER BY tarih, tur DESC, sira", ['c1' => $customerId, 'c2' => $customerId, 'c3' => $customerId]);
     $bal = 0.0; $open = 0.0; $out = [];
     foreach ($mv as $m) {
@@ -368,31 +368,31 @@ function financial_summary(string $from = '', string $to = ''): array {
         return [$where, $params];
     };
     [$where, $params] = $period('tarih', 's');
-    $sales = (float) val('SELECT COALESCE(SUM(toplam),0) FROM sales' . $where, $params);
+    $uy_sales = (float) val('SELECT COALESCE(SUM(toplam),0) FROM uy_sales' . $where, $params);
     [$where, $params] = $period('s.tarih', 'c');
-    $cost = (float) val('SELECT COALESCE(SUM(si.adet * si.maliyet_birim),0) FROM sale_items si JOIN sales s ON s.id = si.sale_id' . $where, $params);
+    $cost = (float) val('SELECT COALESCE(SUM(si.adet * si.maliyet_birim),0) FROM uy_sale_items si JOIN uy_sales s ON s.id = si.sale_id' . $where, $params);
     [$where, $params] = $period('tarih', 'r');
-    $returns = (float) val('SELECT COALESCE(SUM(toplam),0) FROM customer_returns' . $where, $params);
+    $returns = (float) val('SELECT COALESCE(SUM(toplam),0) FROM uy_customer_returns' . $where, $params);
     [$where, $params] = $period('cr.tarih', 'rc');
-    $returnedCost = (float) val('SELECT COALESCE(SUM(cr.adet * cr.maliyet_birim),0) FROM customer_returns cr' . $where, $params);
+    $returnedCost = (float) val('SELECT COALESCE(SUM(cr.adet * cr.maliyet_birim),0) FROM uy_customer_returns cr' . $where, $params);
     [$where, $params] = $period('tarih', 'e');
-    $expenses = (float) val('SELECT COALESCE(SUM(tutar),0) FROM expenses' . $where, $params);
+    $uy_expenses = (float) val('SELECT COALESCE(SUM(tutar),0) FROM uy_expenses' . $where, $params);
     [$where, $params] = $period('tarih', 'd');
-    $donations = (float) val('SELECT COALESCE(SUM(tutar),0) FROM donations' . $where, $params);
-    $netSales = $sales - $returns;
+    $uy_donations = (float) val('SELECT COALESCE(SUM(tutar),0) FROM uy_donations' . $where, $params);
+    $netSales = $uy_sales - $returns;
     $netCost = $cost - $returnedCost;
-    $debt = (float) val('SELECT COALESCE((SELECT SUM(tutar) FROM loans),0) - COALESCE((SELECT SUM(tutar) FROM loan_payments),0)');
+    $debt = (float) val('SELECT COALESCE((SELECT SUM(tutar) FROM uy_loans),0) - COALESCE((SELECT SUM(tutar) FROM uy_loan_payments),0)');
     return [
-        'sales' => $sales, 'returns' => $returns, 'net_sales' => $netSales,
+        'uy_sales' => $uy_sales, 'returns' => $returns, 'net_sales' => $netSales,
         'cost' => $netCost, 'gross_profit' => $netSales - $netCost,
-        'expenses' => $expenses, 'donations' => $donations,
-        'profit' => $netSales - $netCost - $expenses + $donations,
+        'uy_expenses' => $uy_expenses, 'uy_donations' => $uy_donations,
+        'profit' => $netSales - $netCost - $uy_expenses + $uy_donations,
         'debt' => $debt,
     ];
 }
 
 function sale_lines(int $saleId): array {
-    return rows('SELECT si.*, b.kod, b.ad FROM sale_items si JOIN books b ON b.id = si.book_id WHERE sale_id = ?', [$saleId]);
+    return rows('SELECT si.*, b.kod, b.ad FROM uy_sale_items si JOIN uy_books b ON b.id = si.book_id WHERE sale_id = ?', [$saleId]);
 }
 
 /* ---------------- Raporlar ---------------- */
@@ -414,7 +414,7 @@ function report(string $key, array $f = []): array {
     if ($to !== '') { $w .= ' AND s.tarih <= :to'; $p['to'] = $to; }
     if (!empty($f['customer_id'])) { $w .= ' AND s.customer_id = :cid'; $p['cid'] = $f['customer_id']; }
     if (!empty($f['book_id'])) { $w .= ' AND si.book_id = :bid'; $p['bid'] = $f['book_id']; }
-    $base = ' FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id';
+    $base = ' FROM uy_sale_items si JOIN uy_sales s ON s.id = si.sale_id JOIN uy_customers c ON c.id = s.customer_id JOIN uy_books b ON b.id = si.book_id';
 
     switch ($key) {
         case 'kitap':
@@ -424,7 +424,7 @@ function report(string $key, array $f = []): array {
             if ($to !== '') { $rw .= ' AND cr.tarih <= :rt'; $rp['rt'] = $to; }
             if (!empty($f['book_id'])) { $rw .= ' AND si.book_id = :rb'; $rp['rb'] = $f['book_id']; }
             $returns = rows('SELECT si.book_id, SUM(cr.adet) adet, SUM(cr.toplam) tutar
-                FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id' . $rw . ' GROUP BY si.book_id', $rp);
+                FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id' . $rw . ' GROUP BY si.book_id', $rp);
             foreach ($returns as $return) {
                 foreach ($data as &$line) {
                     if ((int) $line['id'] === (int) $return['book_id']) {
@@ -482,15 +482,15 @@ function report(string $key, array $f = []): array {
             usort($agg, fn($x, $y) => $y['tutar'] <=> $x['tutar']);
             return [['Müşteri', 'Telefon', 'Geciken Satış Adedi', 'En Uzun Gecikme (gün)', 'Toplam Geciken Tutar'], $agg];
         case 'pivot':
-            $books = rows("SELECT DISTINCT b.id, b.ad $base $w ORDER BY b.ad", $p);
+            $uy_books = rows("SELECT DISTINCT b.id, b.ad $base $w ORDER BY b.ad", $p);
             $data = rows("SELECT c.id cid, c.ad, si.book_id, SUM(si.adet) adet $base $w GROUP BY c.id, si.book_id ORDER BY c.ad", $p);
             $m = [];
             foreach ($data as $d) { $m[$d['cid']]['Müşteri'] = $d['ad']; $m[$d['cid']][$d['book_id']] = (int) $d['adet']; }
-            $head = ['Müşteri']; foreach ($books as $b) $head[] = $b['ad'];
+            $head = ['Müşteri']; foreach ($uy_books as $b) $head[] = $b['ad'];
             $head[] = 'Toplam'; $out = [];
             foreach ($m as $r) {
                 $line = [$r['Müşteri']]; $t = 0;
-                foreach ($books as $b) { $v = $r[$b['id']] ?? 0; $t += $v; $line[] = $v ?: ''; }
+                foreach ($uy_books as $b) { $v = $r[$b['id']] ?? 0; $t += $v; $line[] = $v ?: ''; }
                 $line[] = $t; $out[] = $line;
             }
             return [$head, $out];
@@ -501,34 +501,34 @@ function report(string $key, array $f = []): array {
 /** Tüm tabloları Excel / Google Sheets için hazırlar. */
 function export_sets(): array {
     $f = [];
-    $books = rows('SELECT kod, ad, alis_fiyati, satis_fiyati, kritik_stok FROM books ORDER BY ad');
-    $cust = rows('SELECT id, tip, ad, il, ilce, yetkili, telefon, eposta, adres FROM customers ORDER BY ad');
-    $sales = rows('SELECT s.id satis_no, s.tarih, s.vade_tarihi, c.ad musteri, c.tip, c.il, c.ilce, b.kod, b.ad kitap, si.adet, si.birim_fiyat, si.toplam
-        FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY s.tarih, s.id');
-    $pay = rows('SELECT p.tarih, c.ad musteri, p.tutar, p.yontem, p.aciklama FROM payments p JOIN customers c ON c.id = p.customer_id ORDER BY p.tarih, p.id');
-    $stockIn = rows('SELECT i.tarih, b.kod, b.ad kitap, i.adet, i.teslim_alan, i.aciklama FROM stock_in i JOIN books b ON b.id = i.book_id ORDER BY i.tarih, i.id');
+    $uy_books = rows('SELECT kod, ad, alis_fiyati, satis_fiyati, kritik_stok FROM uy_books ORDER BY ad');
+    $cust = rows('SELECT id, tip, ad, il, ilce, yetkili, telefon, eposta, adres FROM uy_customers ORDER BY ad');
+    $uy_sales = rows('SELECT s.id satis_no, s.tarih, s.vade_tarihi, c.ad musteri, c.tip, c.il, c.ilce, b.kod, b.ad kitap, si.adet, si.birim_fiyat, si.toplam
+        FROM uy_sale_items si JOIN uy_sales s ON s.id = si.sale_id JOIN uy_customers c ON c.id = s.customer_id JOIN uy_books b ON b.id = si.book_id ORDER BY s.tarih, s.id');
+    $pay = rows('SELECT p.tarih, c.ad musteri, p.tutar, p.yontem, p.aciklama FROM uy_payments p JOIN uy_customers c ON c.id = p.customer_id ORDER BY p.tarih, p.id');
+    $stockIn = rows('SELECT i.tarih, b.kod, b.ad kitap, i.adet, i.teslim_alan, i.aciklama FROM uy_stock_in i JOIN uy_books b ON b.id = i.book_id ORDER BY i.tarih, i.id');
     $stockOut = rows('SELECT o.tarih, b.kod, b.ad kitap, c.ad musteri, o.goturen_kisi, o.adet, o.aciklama
-        FROM stock_out o JOIN books b ON b.id = o.book_id JOIN customers c ON c.id = o.customer_id ORDER BY o.tarih, o.id');
+        FROM uy_stock_out o JOIN uy_books b ON b.id = o.book_id JOIN uy_customers c ON c.id = o.customer_id ORDER BY o.tarih, o.id');
     $deliveries = rows('SELECT d.tarih, s.id satis_no, c.ad musteri, b.kod, b.ad kitap, d.adet, d.goturen_kisi, d.teslim_edilen
-        FROM sale_deliveries d JOIN sale_items si ON si.id = d.sale_item_id JOIN sales s ON s.id = si.sale_id
-        JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY d.tarih, d.id');
-    $customerReturns = rows('SELECT cr.tarih, s.id satis_no, c.ad musteri, b.kod, b.ad kitap, cr.adet, cr.toplam, cr.aciklama FROM customer_returns cr JOIN sale_items si ON si.id = cr.sale_item_id JOIN sales s ON s.id = si.sale_id JOIN customers c ON c.id = s.customer_id JOIN books b ON b.id = si.book_id ORDER BY cr.tarih, cr.id');
-    $stockReturns = rows('SELECT r.tarih, o.id cikis_no, c.ad musteri, b.kod, b.ad kitap, r.adet, r.aciklama FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id JOIN customers c ON c.id = o.customer_id JOIN books b ON b.id = o.book_id ORDER BY r.tarih, r.id');
-    $supplierReturns = rows('SELECT r.tarih, r.tedarikci, b.kod, b.ad kitap, r.adet, r.toplam, r.aciklama FROM supplier_returns r JOIN books b ON b.id = r.book_id ORDER BY r.tarih, r.id');
-    $expenses = rows('SELECT tarih, kategori, tutar, yontem, aciklama FROM expenses ORDER BY tarih, id');
-    $donations = rows('SELECT tarih, bagisci, tutar, yontem, aciklama FROM donations ORDER BY tarih, id');
-    $loans = rows('SELECT l.tarih, l.alacakli, l.tutar, COALESCE(p.tutar,0) odenen, l.tutar - COALESCE(p.tutar,0) kalan, l.aciklama FROM loans l LEFT JOIN (SELECT loan_id, SUM(tutar) tutar FROM loan_payments GROUP BY loan_id) p ON p.loan_id = l.id ORDER BY l.tarih, l.id');
-    $loanPayments = rows('SELECT p.tarih, l.alacakli, p.tutar, p.yontem, p.aciklama FROM loan_payments p JOIN loans l ON l.id = p.loan_id ORDER BY p.tarih, p.id');
+        FROM uy_sale_deliveries d JOIN uy_sale_items si ON si.id = d.sale_item_id JOIN uy_sales s ON s.id = si.sale_id
+        JOIN uy_customers c ON c.id = s.customer_id JOIN uy_books b ON b.id = si.book_id ORDER BY d.tarih, d.id');
+    $customerReturns = rows('SELECT cr.tarih, s.id satis_no, c.ad musteri, b.kod, b.ad kitap, cr.adet, cr.toplam, cr.aciklama FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id JOIN uy_sales s ON s.id = si.sale_id JOIN uy_customers c ON c.id = s.customer_id JOIN uy_books b ON b.id = si.book_id ORDER BY cr.tarih, cr.id');
+    $stockReturns = rows('SELECT r.tarih, o.id cikis_no, c.ad musteri, b.kod, b.ad kitap, r.adet, r.aciklama FROM uy_stock_out_returns r JOIN uy_stock_out o ON o.id = r.stock_out_id JOIN uy_customers c ON c.id = o.customer_id JOIN uy_books b ON b.id = o.book_id ORDER BY r.tarih, r.id');
+    $supplierReturns = rows('SELECT r.tarih, r.tedarikci, b.kod, b.ad kitap, r.adet, r.toplam, r.aciklama FROM uy_supplier_returns r JOIN uy_books b ON b.id = r.book_id ORDER BY r.tarih, r.id');
+    $uy_expenses = rows('SELECT tarih, kategori, tutar, yontem, aciklama FROM uy_expenses ORDER BY tarih, id');
+    $uy_donations = rows('SELECT tarih, bagisci, tutar, yontem, aciklama FROM uy_donations ORDER BY tarih, id');
+    $uy_loans = rows('SELECT l.tarih, l.alacakli, l.tutar, COALESCE(p.tutar,0) odenen, l.tutar - COALESCE(p.tutar,0) kalan, l.aciklama FROM uy_loans l LEFT JOIN (SELECT loan_id, SUM(tutar) tutar FROM uy_loan_payments GROUP BY loan_id) p ON p.loan_id = l.id ORDER BY l.tarih, l.id');
+    $loanPayments = rows('SELECT p.tarih, l.alacakli, p.tutar, p.yontem, p.aciklama FROM uy_loan_payments p JOIN uy_loans l ON l.id = p.loan_id ORDER BY p.tarih, p.id');
     $supplierPurchases = [];
     foreach (supplier_purchase_rows() as $p) {
         if ($p['total_cents'] === null) continue;
         $balance = (int) $p['total_cents'] - (int) $p['paid_cents'] - (int) $p['return_cents'];
         $supplierPurchases[] = [$p['id'], $p['tarih'], $p['kod'], $p['kitap'], $p['due_date'], $p['total_cents'] / 100, $p['paid_cents'] / 100, $p['return_cents'] / 100, max(0, $balance) / 100, max(0, -$balance) / 100];
     }
-    $supplierPayments = rows('SELECT tarih, stock_in_id, amount_cents / 100.0 tutar, yontem, aciklama FROM supplier_payments ORDER BY tarih, id');
+    $supplierPayments = rows('SELECT tarih, stock_in_id, amount_cents / 100.0 tutar, yontem, aciklama FROM uy_supplier_payments ORDER BY tarih, id');
     $profitLoss = financial_summary();
     return [
-        'Kitaplar' => [['Kod', 'Kitap Adı', 'Alış Fiyatı', 'Satış Fiyatı', 'Kritik Stok'], $books],
+        'Kitaplar' => [['Kod', 'Kitap Adı', 'Alış Fiyatı', 'Satış Fiyatı', 'Kritik Stok'], $uy_books],
         'Müşteriler' => [['No', 'Tip', 'Ad', 'İl', 'İlçe', 'Yetkili', 'Telefon', 'E-posta', 'Adres'], $cust],
         'Stok Girişleri' => [['Tarih', 'Kod', 'Kitap', 'Adet', 'Teslim Alan', 'Açıklama'], $stockIn],
         'Stok Çıkışları' => [['Tarih', 'Kod', 'Kitap', 'Müşteri', 'Götüren Kişi', 'Adet', 'Açıklama'], $stockOut],
@@ -536,16 +536,16 @@ function export_sets(): array {
         'Müşteri İadeleri' => [['Tarih', 'Satış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Tutar', 'Açıklama'], $customerReturns],
         'Stok Çıkış İadeleri' => [['Tarih', 'Çıkış No', 'Müşteri', 'Kod', 'Kitap', 'Adet', 'Açıklama'], $stockReturns],
         'Tedarikçi İadeleri' => [['Tarih', 'Tedarikçi', 'Kod', 'Kitap', 'Adet', 'Tutar', 'Açıklama'], $supplierReturns],
-        'Giderler' => [['Tarih', 'Kategori', 'Tutar', 'Yöntem', 'Açıklama'], $expenses],
-        'Bağışlar' => [['Tarih', 'Bağışçı', 'Tutar', 'Yöntem', 'Açıklama'], $donations],
-        'Alınan Borçlar' => [['Tarih', 'Alacaklı', 'Alınan Borç', 'Ödenen', 'Kalan', 'Açıklama'], $loans],
+        'Giderler' => [['Tarih', 'Kategori', 'Tutar', 'Yöntem', 'Açıklama'], $uy_expenses],
+        'Bağışlar' => [['Tarih', 'Bağışçı', 'Tutar', 'Yöntem', 'Açıklama'], $uy_donations],
+        'Alınan Borçlar' => [['Tarih', 'Alacaklı', 'Alınan Borç', 'Ödenen', 'Kalan', 'Açıklama'], $uy_loans],
         'Borç Ödemeleri' => [['Tarih', 'Alacaklı', 'Tutar', 'Yöntem', 'Açıklama'], $loanPayments],
         'Tedarikçi Borçları' => [['Giriş No', 'Tarih', 'Kod', 'Kitap', 'Vade', 'Alış', 'Ödenen', 'İade', 'Borç', 'Alacak'], $supplierPurchases],
         'Tedarikçi Ödemeleri' => [['Tarih', 'Giriş No', 'Tutar', 'Yöntem', 'Açıklama'], $supplierPayments],
         'Kâr Zarar' => [['Satışlar', 'Müşteri İadeleri', 'Net Satış', 'Kitap Maliyeti', 'Giderler', 'Bağışlar', 'Net Kâr/Zarar', 'Kalan Borç'], [[
-            $profitLoss['sales'], $profitLoss['returns'], $profitLoss['net_sales'], $profitLoss['cost'], $profitLoss['expenses'], $profitLoss['donations'], $profitLoss['profit'], $profitLoss['debt'],
+            $profitLoss['uy_sales'], $profitLoss['returns'], $profitLoss['net_sales'], $profitLoss['cost'], $profitLoss['uy_expenses'], $profitLoss['uy_donations'], $profitLoss['profit'], $profitLoss['debt'],
         ]]],
-        'Satışlar' => [['Satış No', 'Tarih', 'Vade', 'Müşteri', 'Tip', 'İl', 'İlçe', 'Kod', 'Kitap', 'Adet', 'Birim Fiyat', 'Tutar'], $sales],
+        'Satışlar' => [['Satış No', 'Tarih', 'Vade', 'Müşteri', 'Tip', 'İl', 'İlçe', 'Kod', 'Kitap', 'Adet', 'Birim Fiyat', 'Tutar'], $uy_sales],
         'Tahsilatlar' => [['Tarih', 'Müşteri', 'Tutar', 'Yöntem', 'Açıklama'], $pay],
         'Güncel Stok' => report('stok', $f),
         'Cari Özet' => report('cari', $f),
@@ -756,7 +756,7 @@ function send_weekly_reminders(): array {
         if ($balance <= 0.004) continue;
         $counts['müşteri']++;
         foreach ($senders as $channel => $send) {
-            $existing = row('SELECT durum FROM notification_log WHERE customer_id = ? AND hafta_baslangici = ? AND kanal = ?',
+            $existing = row('SELECT durum FROM uy_notification_log WHERE customer_id = ? AND hafta_baslangici = ? AND kanal = ?',
                 [$customer['id'], $weekStart, $channel]);
             if (($existing['durum'] ?? '') === 'gönderildi') continue;
 
@@ -774,7 +774,7 @@ function send_weekly_reminders(): array {
                 $error = $e->getMessage();
             }
 
-            q('INSERT INTO notification_log (customer_id, hafta_baslangici, kanal, durum, hedef, hata) VALUES (?,?,?,?,?,?)
+            q('INSERT INTO uy_notification_log (customer_id, hafta_baslangici, kanal, durum, hedef, hata) VALUES (?,?,?,?,?,?)
                 ON DUPLICATE KEY UPDATE durum=VALUES(durum), hedef=VALUES(hedef), hata=VALUES(hata)',
                 [$customer['id'], $weekStart, $channel, $status, $target, $error]);
             $counts[$status]++;
@@ -787,13 +787,13 @@ function send_weekly_reminders(): array {
 
 function layout_head(string $title, string $page): void {
     $groups = [
-        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler', 'account' => 'Hesabım'],
+        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler', 'customers' => 'Müşteriler', 'account' => 'Hesabım'],
         'Stok' => ['stock_in' => 'Stok Girişi', 'stock_out' => 'Teslimat Bekleyen Satışlar',
             'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri'],
-        'Satış ve İade' => ['sales' => 'Satışlar', 'returns_customer' => 'Müşteri İadesi',
+        'Satış ve İade' => ['sales' => 'Satış Kayıt', 'sales_list' => 'Satış Listesi', 'returns_customer' => 'Müşteri İadesi',
             'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi'],
-        'Müşteriler' => ['customers' => 'Müşteri Kartları', 'payments' => 'Tahsilat', 'cari' => 'Cari / Ekstre', 'overdue' => 'Vadeli Alacak'],
-        'Finans' => ['donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'expenses' => 'Giderler', 'finance' => 'Kâr / Zarar'],
+        'Muhasebe' => ['payments' => 'Tahsilat', 'cari' => 'Cari / Ekstre', 'overdue' => 'Vadeli Alacak'],
+        'Finans' => ['expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'finance' => 'Kâr / Zarar'],
         'Diğer' => ['notifications' => 'Bildirimler', 'reports' => 'Raporlar', 'export' => 'Excel / Sheets'],
     ];
     echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><b class="brand">📚 Kitap Cari</b><div class="nav-groups">';

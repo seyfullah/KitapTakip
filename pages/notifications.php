@@ -21,7 +21,7 @@ layout_head('Haftalık Alacak Bildirimleri', 'notifications');
 <?php
 $data = [];
 foreach (rows('SELECT l.hafta_baslangici, c.ad musteri, l.kanal, l.durum, l.hedef, l.hata, l.guncellendi
-    FROM notification_log l JOIN customers c ON c.id = l.customer_id
+    FROM uy_notification_log l JOIN uy_customers c ON c.id = l.customer_id
     ORDER BY l.guncellendi DESC, l.id DESC LIMIT 200') as $log) {
     $data[] = [dtr($log['hafta_baslangici']), $log['musteri'], $log['kanal'], $log['durum'], $log['hedef'], $log['hata'], dtr(substr($log['guncellendi'], 0, 10)) . ' ' . substr($log['guncellendi'], 11, 5)];
 }

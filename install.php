@@ -14,9 +14,9 @@ db()->exec((string) file_get_contents(__DIR__ . '/sql/schema' . (cfg('app_storag
 $args = array_values(array_filter($argv ?? [], static fn($arg) => !str_starts_with($arg, '--')));
 $u = $args[1] ?? 'admin'; $pw = $args[2] ?? 'admin123';
 if (cfg('app_storage') === 'sqlite') {
-    q('INSERT INTO users (kullanici, sifre_hash) VALUES (?, ?) ON CONFLICT(kullanici) DO UPDATE SET sifre_hash = excluded.sifre_hash', [$u, password_hash($pw, PASSWORD_DEFAULT)]);
+    q('INSERT INTO uy_users (kullanici, sifre_hash) VALUES (?, ?) ON CONFLICT(kullanici) DO UPDATE SET sifre_hash = excluded.sifre_hash', [$u, password_hash($pw, PASSWORD_DEFAULT)]);
 } else {
-    q('INSERT INTO users (kullanici, sifre_hash) VALUES (?, ?) ON DUPLICATE KEY UPDATE sifre_hash = VALUES(sifre_hash)', [$u, password_hash($pw, PASSWORD_DEFAULT)]);
+    q('INSERT INTO uy_users (kullanici, sifre_hash) VALUES (?, ?) ON DUPLICATE KEY UPDATE sifre_hash = VALUES(sifre_hash)', [$u, password_hash($pw, PASSWORD_DEFAULT)]);
 }
 echo "Kurulum tamam. Kullanıcı: $u\n";
 if ($demo) require __DIR__ . '/sql/demo.php';

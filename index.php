@@ -14,7 +14,7 @@ if ($p === 'login') {
     $err = '';
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         csrf_check();
-        $u = row('SELECT * FROM users WHERE kullanici = ?', [post('kullanici')]);
+        $u = row('SELECT * FROM uy_users WHERE kullanici = ?', [post('kullanici')]);
         if ($u && password_verify($_POST['sifre'] ?? '', $u['sifre_hash'])) {
             session_regenerate_id(true);
             $_SESSION['uid'] = $u['id'];
@@ -31,6 +31,6 @@ if ($p === 'login') {
 if (empty($_SESSION['uid'])) redirect('?p=login');
 csrf_check();
 
-$pages = ['dashboard', 'books', 'stock_in', 'stock_out', 'stock_current', 'stock_in_history', 'stock_out_history', 'people', 'account', 'customers', 'sales', 'returns_customer', 'returns_stock_out', 'returns_supplier', 'supplier_payments', 'payments', 'cari', 'overdue', 'expenses', 'donations', 'loans', 'finance', 'notifications', 'reports', 'export'];
+$pages = ['dashboard', 'books', 'stock_in', 'stock_out', 'stock_current', 'stock_in_history', 'stock_out_history', 'people', 'account', 'customers', 'sales', 'sales_list', 'returns_customer', 'returns_stock_out', 'returns_supplier', 'supplier_payments', 'payments', 'cari', 'overdue', 'expenses', 'donations', 'loans', 'finance', 'notifications', 'reports', 'export'];
 if (!in_array($p, $pages, true)) { http_response_code(404); $p = 'dashboard'; }
 require __DIR__ . '/pages/' . $p . '.php';

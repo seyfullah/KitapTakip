@@ -7,16 +7,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         try {
             $lock = cfg('app_storage') === 'sqlite' ? '' : ' FOR UPDATE';
-            $stock = row('SELECT id, tarih, adet FROM stock_in WHERE id = ?' . $lock, [$id]);
+            $stock = row('SELECT id, tarih, adet FROM uy_stock_in WHERE id = ?' . $lock, [$id]);
             if (!$stock) throw new DomainException('Stok girişi bulunamadı.');
             if ((int) $stock['adet'] <= 0) throw new DomainException('Stok girişinin adedi geçersiz.');
-            $purchase = row('SELECT total_cents, due_date FROM supplier_purchases WHERE stock_in_id = ?', [$id]);
+            $purchase = row('SELECT total_cents, due_date FROM uy_supplier_purchases WHERE stock_in_id = ?', [$id]);
             if (post('act') === 'purchase') {
                 if ($purchase) throw new DomainException('Bu stok girişinin alış bilgisi zaten mevcut.');
                 $due = valid_date(post('vade_tarihi'));
                 if ($due < $stock['tarih']) throw new DomainException('Vade tarihi stok girişinden önce olamaz.');
-                if ((int) val('SELECT COUNT(*) FROM supplier_return_links WHERE stock_in_id = ?', [$id])) throw new DomainException('İadesi bulunan giriş için alış bilgisi eklenemez.');
-                q('INSERT INTO supplier_purchases (stock_in_id, total_cents, due_date) VALUES (?,?,?)', [$id, $amount, $due]);
+                if ((int) val('SELECT COUNT(*) FROM uy_supplier_return_links WHERE stock_in_id = ?', [$id])) throw new DomainException('İadesi bulunan giriş için alış bilgisi eklenemez.');
+                q('INSERT INTO uy_supplier_purchases (stock_in_id, total_cents, due_date) VALUES (?,?,?)', [$id, $amount, $due]);
                 $message = 'Alış bilgisi kaydedildi.';
             } elseif (post('act') === 'pay') {
                 if (!$purchase) throw new DomainException('Önce alış bilgilerini kaydedin.');
@@ -24,11 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($date < $stock['tarih']) throw new DomainException('Ödeme tarihi stok girişinden önce olamaz.');
                 $method = post('yontem');
                 if (!in_array($method, ['Nakit', 'Havale/EFT', 'Kart', 'Diğer'], true)) throw new DomainException('Ödeme yöntemi seçin.');
-                $paid = (int) val('SELECT COALESCE(SUM(amount_cents),0) FROM supplier_payments WHERE stock_in_id = ?', [$id]);
-                $returned = (int) val('SELECT COALESCE(SUM(ROUND(r.toplam * 100)),0) FROM supplier_return_links l JOIN supplier_returns r ON r.id = l.return_id WHERE l.stock_in_id = ?', [$id]);
+                $paid = (int) val('SELECT COALESCE(SUM(amount_cents),0) FROM uy_supplier_payments WHERE stock_in_id = ?', [$id]);
+                $returned = (int) val('SELECT COALESCE(SUM(ROUND(r.toplam * 100)),0) FROM uy_supplier_return_links l JOIN uy_supplier_returns r ON r.id = l.return_id WHERE l.stock_in_id = ?', [$id]);
                 $remaining = (int) $purchase['total_cents'] - $paid - $returned;
                 if ($amount > $remaining) throw new DomainException('Ödeme kalan borcu aşamaz.');
-                q('INSERT INTO supplier_payments (stock_in_id, tarih, amount_cents, yontem, aciklama) VALUES (?,?,?,?,?)', [$id, $date, $amount, $method, post('aciklama')]);
+                q('INSERT INTO uy_supplier_payments (stock_in_id, tarih, amount_cents, yontem, aciklama) VALUES (?,?,?,?,?)', [$id, $date, $amount, $method, post('aciklama')]);
                 $message = 'Tedarikçi ödemesi kaydedildi.';
             } else {
                 throw new DomainException('Geçersiz işlem.');
@@ -43,11 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) {
         flash($e->getMessage());
     }
-    redirect('?p=supplier_payments');
+    redirect('?p=uy_supplier_payments');
 }
 
 $purchases = supplier_purchase_rows();
-layout_head('Tedarikçi Ödemeleri', 'supplier_payments');
+layout_head('Tedarikçi Ödemeleri', 'uy_supplier_payments');
 ?>
 <div class="form-grid">
 <form method="post" class="card">
@@ -81,7 +81,7 @@ foreach ($purchases as $p) {
 table(['Giriş', 'Tarih', 'Kitap', 'Vade', 'Alış', 'Ödenen', 'İade', 'Kalan Borç', 'Alacak', 'Durum'], $data, ['money' => [4, 5, 6, 7, 8], 'totals' => [4, 5, 6, 7, 8]]);
 echo '<h2>Ödeme Geçmişi</h2>';
 $data = [];
-foreach (rows('SELECT p.*, b.ad kitap FROM supplier_payments p JOIN stock_in i ON i.id = p.stock_in_id JOIN books b ON b.id = i.book_id ORDER BY p.tarih DESC, p.id DESC') as $payment) {
+foreach (rows('SELECT p.*, b.ad kitap FROM uy_supplier_payments p JOIN uy_stock_in i ON i.id = p.stock_in_id JOIN uy_books b ON b.id = i.book_id ORDER BY p.tarih DESC, p.id DESC') as $payment) {
     $data[] = [dtr($payment['tarih']), '#' . $payment['stock_in_id'], $payment['kitap'], $payment['amount_cents'] / 100, $payment['yontem'], $payment['aciklama']];
 }
 table(['Tarih', 'Giriş', 'Kitap', 'Tutar', 'Yöntem', 'Açıklama'], $data, ['money' => [3], 'totals' => [3]]);

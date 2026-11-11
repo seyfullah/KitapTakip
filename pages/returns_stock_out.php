@@ -10,13 +10,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         try {
             $lock = cfg('app_storage') === 'sqlite' ? '' : ' FOR UPDATE';
-            $out = row('SELECT id, tarih, adet FROM stock_out WHERE id = ?' . $lock, [$outId]);
+            $out = row('SELECT id, tarih, adet FROM uy_stock_out WHERE id = ?' . $lock, [$outId]);
             if (!$out) throw new DomainException('İade edilecek stok çıkışını seçin.');
-            $returned = (int) val('SELECT COALESCE(SUM(adet),0) FROM stock_out_returns WHERE stock_out_id = ?', [$outId]);
+            $returned = (int) val('SELECT COALESCE(SUM(adet),0) FROM uy_stock_out_returns WHERE stock_out_id = ?', [$outId]);
             $remaining = (int) $out['adet'] - $returned;
             if ($units > $remaining) throw new DomainException("İade miktarı kalan çıkış adedini aşamaz ($remaining adet).");
             if ($date < $out['tarih']) throw new DomainException('İade tarihi çıkış tarihinden önce olamaz.');
-            q('INSERT INTO stock_out_returns (stock_out_id, tarih, adet, aciklama) VALUES (?,?,?,?)',
+            q('INSERT INTO uy_stock_out_returns (stock_out_id, tarih, adet, aciklama) VALUES (?,?,?,?)',
                 [$outId, $date, $units, post('aciklama')]);
             $pdo->commit();
         } catch (Throwable $e) {
@@ -33,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 layout_head('Stok Çıkış İadesi', 'returns_stock_out');
 $outs = rows('SELECT o.id, o.tarih, o.adet, c.ad musteri, b.kod, b.ad kitap, COALESCE(r.adet,0) iade
-    FROM stock_out o JOIN customers c ON c.id = o.customer_id JOIN books b ON b.id = o.book_id
-    LEFT JOIN (SELECT stock_out_id, SUM(adet) adet FROM stock_out_returns GROUP BY stock_out_id) r ON r.stock_out_id = o.id
+    FROM uy_stock_out o JOIN uy_customers c ON c.id = o.customer_id JOIN uy_books b ON b.id = o.book_id
+    LEFT JOIN (SELECT stock_out_id, SUM(adet) adet FROM uy_stock_out_returns GROUP BY stock_out_id) r ON r.stock_out_id = o.id
     WHERE o.adet > COALESCE(r.adet,0) ORDER BY o.tarih DESC, o.id DESC');
 ?>
 <form method="post" class="card entry-form stock-entry">
@@ -49,8 +49,8 @@ $outs = rows('SELECT o.id, o.tarih, o.adet, c.ad musteri, b.kod, b.ad kitap, COA
 <?php
 $data = [];
 foreach (rows('SELECT r.*, o.id cikis_no, c.ad musteri, b.kod, b.ad kitap
-    FROM stock_out_returns r JOIN stock_out o ON o.id = r.stock_out_id JOIN customers c ON c.id = o.customer_id
-    JOIN books b ON b.id = o.book_id ORDER BY r.tarih DESC, r.id DESC LIMIT 200') as $return) {
+    FROM uy_stock_out_returns r JOIN uy_stock_out o ON o.id = r.stock_out_id JOIN uy_customers c ON c.id = o.customer_id
+    JOIN uy_books b ON b.id = o.book_id ORDER BY r.tarih DESC, r.id DESC LIMIT 200') as $return) {
     $data[] = [dtr($return['tarih']), '#' . $return['cikis_no'], $return['musteri'], $return['kod'] . ' - ' . $return['kitap'], $return['adet'], $return['aciklama']];
 }
 table(['Tarih', 'Stok Çıkışı', 'Müşteri', 'Kitap', 'Adet', 'Açıklama'], $data, ['int' => [4], 'totals' => [4]]);

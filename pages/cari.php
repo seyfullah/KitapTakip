@@ -8,7 +8,7 @@ if (!$cid) {
     table(['Müşteri', 'Tip', 'İl / İlçe', 'Toplam Satış', 'Toplam Tahsilat', 'Kalan Alacak'], $data, ['money' => [3, 4, 5], 'totals' => [3, 4, 5], 'raw' => [0 => true]]);
     layout_foot(); exit;
 }
-$c = row('SELECT * FROM customers WHERE id = ?', [$cid]) or redirect('?p=cari');
+$c = row('SELECT * FROM uy_customers WHERE id = ?', [$cid]) or redirect('?p=cari');
 $st = statement($cid, $from, $to);
 $data = [];
 if ($from !== '') $data[] = [dtr($from), 'Devir', 'Önceki dönem bakiyesi', '', '', $st['opening']];

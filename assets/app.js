@@ -23,20 +23,9 @@
       if (open) { open.open = false; open.querySelector('summary').focus(); }
     });
     const normalize = text => text.toLocaleLowerCase('tr-TR').trim();
+    // Kişi listesi arama kutusu kaldırıldı - her zaman tüm kişiler gösterilir
     document.querySelectorAll('.person-select').forEach(select => {
-      const label = document.createElement('label');
-      label.textContent = 'Kişi listesinde ara';
-      const input = document.createElement('input');
-      input.type = 'search';
-      label.appendChild(input);
-      select.parentElement.before(label);
-      input.addEventListener('input', () => {
-        const query = normalize(input.value);
-        [...select.options].forEach(option => {
-          option.hidden = option.value !== '' && !normalize(option.textContent).includes(query);
-        });
-        if (select.selectedOptions[0]?.hidden) select.value = '';
-      });
+      // Arama özelliği devre dışı bırakıldı
     });
     document.querySelectorAll('table.sortable-table').forEach(table => {
       const body = table.tBodies[0];
