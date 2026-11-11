@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) {
         flash($e->getMessage());
     }
-    redirect('stock_out.php' . ($saleId > 0 ? '&sale_id=' . $saleId : ''));
+    redirect('stock_out.php' . ($saleId > 0 ? '?sale_id=' . $saleId : ''));
 }
 $itemQuery = ' FROM sale_items si
     LEFT JOIN (SELECT sale_item_id, SUM(adet) adet FROM sale_deliveries GROUP BY sale_item_id) d ON d.sale_item_id = si.id
@@ -33,7 +33,7 @@ if (!$saleId) {
     foreach ($sales as $sale) {
         $data[] = ['#' . $sale['id'], dtr($sale['tarih']), $sale['musteri'] . ' (' . $sale['tip'] . ')',
             dtr($sale['vade_tarihi']), $sale['toplam'], $sale['kalan'],
-            '<a href="stock_out.php&amp;sale_id=' . h($sale['id']) . '">Siparişi görüntüle</a>'];
+            '<a href="stock_out.php?sale_id=' . h($sale['id']) . '">Siparişi görüntüle</a>'];
     }
     table(['Satış', 'Tarih', 'Müşteri', 'Vade', 'Satış Tutarı', 'Bekleyen Adet', ''], $data,
         ['money' => [4], 'int' => [5], 'raw' => [6 => true]]);
@@ -55,7 +55,7 @@ $items = rows('SELECT si.id, si.adet, si.birim_fiyat, si.toplam, b.kod, b.ad kit
     ' JOIN books b ON b.id = si.book_id WHERE si.sale_id = ? ORDER BY si.id', [$saleId]);
 $currentPersonId = current_person_id();
 layout_head('Satış #' . $saleId . ' · Teslimat', 'stock_out');
-echo '<p><a href="stock_out.php">← Teslimat bekleyen satışlara dön</a></p>';
+    echo '<p><a href="stock_out.php">← Teslimat bekleyen satışlara dön</a></p>';
 echo '<div class="card"><strong>Müşteri:</strong> ' . h($sale['musteri'] . ' (' . $sale['tip'] . ')') .
     '<br><strong>Satış tarihi:</strong> ' . h(dtr($sale['tarih'])) .
     ' · <strong>Vade:</strong> ' . h(dtr($sale['vade_tarihi'])) .
