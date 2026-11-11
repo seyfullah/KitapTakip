@@ -33,4 +33,4 @@ csrf_check();
 
 $pages = ['dashboard', 'books', 'stock_in', 'stock_out', 'stock_current', 'stock_in_history', 'stock_out_history', 'people', 'account', 'customers', 'sales', 'sales_list', 'returns_customer', 'returns_stock_out', 'returns_supplier', 'supplier_payments', 'payments', 'cari', 'overdue', 'expenses', 'donations', 'loans', 'finance', 'notifications', 'reports', 'export'];
 if (!in_array($p, $pages, true)) { http_response_code(404); $p = 'dashboard'; }
-require __DIR__ . '/pages/' . $p . '.php';
+require __DIR__ . '/' . $p . '.php';

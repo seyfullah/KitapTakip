@@ -20,13 +20,18 @@ jobs:
           echo "Commit: ${{ github.sha }}"
           echo "Trigger: ${{ github.event_name }}"
           echo ""
-          echo "📁 Yüklenecek dosyalar:"
-          find . -type f ! -path './.git/*' ! -path './.github/*' ! -path './.vscode/*' ! -path '**/node_modules/*' | head -20
-          echo "... (daha fazla)"
-          echo ""
+          echo "📁 Yüklenecek dosyalar (FTP exclude kuralları uygulandı):"
           echo "✓ setup.php dahil: $(test -f ./setup.php && echo 'EVET' || echo 'HAYIR')"
           echo "✓ index.php dahil: $(test -f ./index.php && echo 'EVET' || echo 'HAYIR')"
           echo "✓ lib.php dahil: $(test -f ./lib.php && echo 'EVET' || echo 'HAYIR')"
+          echo ""
+          echo "🚫 Exclude edilen:"
+          echo "  - .git (versiyon kontrol)"
+          echo "  - .github (workflow dosyaları)"
+          echo "  - .vscode (düzenleyici ayarları)"
+          echo "  - tests/ (test dosyaları)"
+          echo "  - data/ (yerel SQLite veritabanı)"
+          echo "  - README.md (belgeleme)"
 
       - name: FTPS ile yükle
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
@@ -40,13 +45,20 @@ jobs:
           local-dir: ./
           state-name: .ftp-deploy-sync-state.json
           exclude: |
-            **/.git*
-            **/.github/**
-            **/.vscode/**
-            **/node_modules/**
-            **/.DS_Store
-            **/Thumbs.db
-            **/setup-log
+            .git
+            .gitignore
+            .github
+            .vscode
+            node_modules
+            .DS_Store
+            Thumbs.db
+            setup-log
+            *.bak
+            tests/
+            data/
+            README.md
+            composer.json
+            composer.lock
 
       - name: Deployment sonrası bilgi
         if: success()
