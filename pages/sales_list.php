@@ -59,7 +59,7 @@ foreach (rows("SELECT s.id, s.tarih, s.vade_tarihi, s.durum, c.ad musteri, c.tip
         $r['musteri'] . ' (' . $r['tip'] . ')', 
         ($r['adet'] ?? 0), 
         h($r['durum']),
-        fmt($r['toplam']),
+        (float) $r['toplam'],
         '<form method="post" class="inline"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="act" value="view"><input type="hidden" name="id" value="' . $r['id'] . '"><button>İncele</button></form>'
     ];
 }
