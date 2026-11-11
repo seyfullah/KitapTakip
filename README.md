@@ -30,6 +30,12 @@ Uygulamanın temel iş akışlarını aşağıdaki diyagramlarda inceleyebilirsi
 - **[Stok Akışı](docs/WORKFLOW_STOCK.md)**: Stok girişi, satış, çıkış ve iade işlemlerinin stok üzerindeki etkisi
 - **[Finansal Akış](docs/WORKFLOW_FINANCIAL.md)**: Müşteri alacağı, tahsilat, tedarikçi borcu ve kâr/zarar hesaplaması
 
+## Veri Taşıma
+
+Mevcut SQLite veritabanındaki verileri MariaDB/MySQL'e taşımak için:
+
+- **[SQLite → MySQL/MariaDB Taşıma Kılavuzu](docs/MIGRATION_SQLITE_TO_MYSQL.md)**: Adım adım talimatlar, troubleshooting ve veri tutarlılığı kontrol
+
 ## Hızlı deneme (MySQL ve e-posta olmadan)
 
 Varsayılan dosya modu verileri tek bir SQLite dosyasında tutar; MySQL/MariaDB sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır. Mevcut SQLite dosyaları uygulama açıldığında otomatik ve işlem içinde güncellenir; eski kayıtlar korunur.
