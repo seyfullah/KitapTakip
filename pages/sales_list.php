@@ -6,13 +6,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$s) { flash('Satış bulunamadı.'); redirect('?p=sales_list'); }
         layout_head('Satış Detayı', 'sales_list');
         echo '<div class="card">';
-        echo '<div class="f"><label>No<strong>#' . $s['id'] . '</strong></label>';
+        echo '<div class="f" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem"><label>No<strong>#' . $s['id'] . '</strong></label>';
         echo '<label>Müşteri<strong>' . h(val('SELECT ad FROM uy_customers WHERE id = ?', [$s['customer_id']])) . '</strong></label>';
         echo '<label>Tarih<strong>' . dtr($s['tarih']) . '</strong></label>';
         echo '<label>Vade Tarihi<strong>' . dtr($s['vade_tarihi']) . '</strong></label>';
         echo '<label>Durumu<strong>' . h($s['durum']) . '</strong></label>';
         echo '<label>Toplam<strong>' . fmt($s['toplam']) . ' TL</strong></label>';
-        if ($s['aciklama']) echo '<label>Açıklama<strong>' . h($s['aciklama']) . '</strong></label>';
+        if ($s['aciklama']) echo '<label style="grid-column:1/-1">Açıklama<strong>' . h($s['aciklama']) . '</strong></label>';
         echo '</div>';
         
         echo '<div class="table-wrap"><table><thead><tr><th>Kitap</th><th>Adet</th><th>Birim Fiyat</th><th>Tutar</th></tr></thead><tbody>';
