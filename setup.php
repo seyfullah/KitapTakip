@@ -200,8 +200,4 @@ echo 'FTP yoluyla silelebilir veya sunucu panelinden rimraf komutu ile silinebil
 echo '</div>';
 
 echo '</div></body></html>';
-
-function h($str) {
-    return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8');
-}
 ?>
