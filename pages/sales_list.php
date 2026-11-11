@@ -28,8 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 layout_head('Satış Listesi', 'sales_list');
-$f = ['from' => get('from'), 'to' => get('to'), 'cid' => (int) get('customer_id'), 'durum' => get('durum', '')];
-echo '<form class="f no-print"><input type="hidden" name="p" value="sales_list"><label>Başlangıç<input type="date" name="from" value="' . h($f['from']) . '"></label><label>Bitiş<input type="date" name="to" value="' . h($f['to']) . '"></label><label>Müşteri' . select('customer_id', customer_opts(true), $f['cid']) . '</label><label>Durum' . select('durum', ['' => '— Tümü —', 'Yeni' => 'Yeni', 'Teslimat Bekliyor' => 'Teslimat Bekliyor', 'Teslim Edildi' => 'Teslim Edildi', 'İade Edildi' => 'İade Edildi', 'İptal Edildi' => 'İptal Edildi'], $f['durum']) . '</label><button>Filtrele</button></form>';
+$default_from = date('Y-m-d', strtotime('-7 days'));
+$default_to = date('Y-m-d');
+$f = ['from' => get('from', $default_from), 'to' => get('to', $default_to), 'cid' => (int) get('customer_id'), 'durum' => get('durum', '')];
+echo '<form class="f no-print"><input type="hidden" name="p" value="sales_list"><label>Başlangıç<input type="date" name="from" value="' . h($f['from']) . '"></label><label>Bitiş<input type="date" name="to" value="' . h($f['to']) . '"></label><label>Müşteri<select name="customer_id"><option value="">— Tümü —</option>';
+foreach (rows('SELECT id, ad FROM uy_customers ORDER BY ad') as $c) {
+    echo '<option value="' . $c['id'] . '"' . ($f['cid'] == $c['id'] ? ' selected' : '') . '>' . h($c['ad']) . '</option>';
+}
+echo '</select></label><label>Durum' . select('durum', ['' => '— Tümü —', 'Yeni' => 'Yeni', 'Teslimat Bekliyor' => 'Teslimat Bekliyor', 'Teslim Edildi' => 'Teslim Edildi', 'İade Edildi' => 'İade Edildi', 'İptal Edildi' => 'İptal Edildi'], $f['durum']) . '</label><button>Filtrele</button></form>';
 
 $w = ' WHERE 1=1'; $p = [];
 if ($f['from']) { $w .= ' AND s.tarih >= :f'; $p['f'] = $f['from']; }
