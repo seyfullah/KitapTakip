@@ -23,9 +23,13 @@ jobs:
           echo "📁 Yüklenecek dosyalar:"
           find . -type f ! -path './.git/*' ! -path './.github/*' ! -path './.vscode/*' ! -path '**/node_modules/*' | head -20
           echo "... (daha fazla)"
+          echo ""
+          echo "✓ setup.php dahil: $(test -f ./setup.php && echo 'EVET' || echo 'HAYIR')"
+          echo "✓ index.php dahil: $(test -f ./index.php && echo 'EVET' || echo 'HAYIR')"
+          echo "✓ lib.php dahil: $(test -f ./lib.php && echo 'EVET' || echo 'HAYIR')"
 
       - name: FTPS ile yükle
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.7
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
