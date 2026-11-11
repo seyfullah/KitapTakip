@@ -45,7 +45,18 @@ jobs:
 
       - name: Deployment sonrası bilgi
         if: success()
-        run: echo "✅ Dosyalar başarıyla yüklendi"
+        run: |
+          echo "✅ Dosyalar başarıyla yüklendi"
+          echo ""
+          echo "🔧 KURULUM TAMAMLA:"
+          echo "1. Tarayıcıda şu URL'yi aç:"
+          echo "   https://pusulad1.com/uy/setup.php"
+          echo ""
+          echo "2. Kurulum sayfası otomatik veritabanı oluşturacak"
+          echo ""
+          echo "3. Kurulum tamamlandıktan sonra setup.php'yi sil:"
+          echo "   - FTP yoluyla silebilir"
+          echo "   - Veya sunucu panelinden File Manager ile"
 
       - name: Deployment hatası
         if: failure()
