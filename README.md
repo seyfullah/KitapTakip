@@ -22,6 +22,14 @@ PHP tabanlı, Türkçe kitap dağıtımı, stok, satış ve cari takip uygulamas
 - Panelde "en çok satış yapılan" ve "en yüksek alacaklı" müşteri listeleri
 - Her Pazartesi 08.00'de alacaklı müşterilere e-posta ve SMS hatırlatması
 
+## İş Süreçleri (Workflow)
+
+Uygulamanın temel iş akışlarını aşağıdaki diyagramlarda inceleyebilirsiniz:
+
+- **[Satış Akışı](docs/WORKFLOW_SALES.md)**: Satış kaydı, teslimat, durum geçişleri ve iade işlemleri
+- **[Stok Akışı](docs/WORKFLOW_STOCK.md)**: Stok girişi, satış, çıkış ve iade işlemlerinin stok üzerindeki etkisi
+- **[Finansal Akış](docs/WORKFLOW_FINANCIAL.md)**: Müşteri alacağı, tahsilat, tedarikçi borcu ve kâr/zarar hesaplaması
+
 ## Hızlı deneme (MySQL ve e-posta olmadan)
 
 Varsayılan dosya modu verileri tek bir SQLite dosyasında tutar; MySQL/MariaDB sunucusu veya e-posta ayarı gerekmez. PHP'de `pdo_sqlite` etkin olmalıdır. Mevcut SQLite dosyaları uygulama açıldığında otomatik ve işlem içinde güncellenir; eski kayıtlar korunur.
