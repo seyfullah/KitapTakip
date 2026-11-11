@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) post('id');
     if (post('act') === 'delete') {
@@ -22,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('Kişi kaydedildi. Geçmiş hareketlerdeki adlar değiştirilmez.');
         }
     }
-    redirect('?p=people');
+    redirect('people.php');
 }
 $person = get('edit') ? row('SELECT id, ad FROM uy_people WHERE id = ?', [(int) get('edit')]) : null;
 $person ??= ['id' => '', 'ad' => ''];
@@ -32,13 +33,13 @@ layout_head('Kişiler', 'uy_people');
   <input type="hidden" name="_csrf" value="<?= csrf() ?>">
   <input type="hidden" name="id" value="<?= h($person['id']) ?>">
   <label>Ad Soyad<input name="ad" maxlength="120" value="<?= h($person['ad']) ?>" required></label>
-  <button>Kaydet</button><?php if ($person['id']) echo '<a class="btn alt" href="?p=uy_people">Vazgeç</a>'; ?>
+  <button>Kaydet</button><?php if ($person['id']) echo '<a class="btn alt" href="uy_people.php">Vazgeç</a>'; ?>
 </form>
 <p class="muted">Kişi adı değiştirilse veya listeden silinse de geçmiş hareketlerde kayıt anındaki ad korunur.</p>
 <?php
 $data = [];
 foreach (rows('SELECT id, ad FROM uy_people ORDER BY ad') as $person) {
-    $data[] = [$person['ad'], '<a href="?p=uy_people&edit=' . h($person['id']) . '">Düzenle</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Kişi listeden silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . h($person['id']) . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
+    $data[] = [$person['ad'], '<a href="uy_people.php&edit=' . h($person['id']) . '">Düzenle</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Kişi listeden silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . h($person['id']) . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
 }
 table(['Ad Soyad', ''], $data, ['raw' => [1 => true]]);
 layout_foot();

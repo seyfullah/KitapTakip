@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 $saleId = (int) ($_SERVER['REQUEST_METHOD'] === 'POST' ? post('sale_id') : get('sale_id'));
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -13,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) {
         flash($e->getMessage());
     }
-    redirect('?p=stock_out' . ($saleId > 0 ? '&sale_id=' . $saleId : ''));
+    redirect('stock_out.php' . ($saleId > 0 ? '&sale_id=' . $saleId : ''));
 }
 $itemQuery = ' FROM sale_items si
     LEFT JOIN (SELECT sale_item_id, SUM(adet) adet FROM sale_deliveries GROUP BY sale_item_id) d ON d.sale_item_id = si.id
@@ -32,7 +33,7 @@ if (!$saleId) {
     foreach ($sales as $sale) {
         $data[] = ['#' . $sale['id'], dtr($sale['tarih']), $sale['musteri'] . ' (' . $sale['tip'] . ')',
             dtr($sale['vade_tarihi']), $sale['toplam'], $sale['kalan'],
-            '<a href="?p=stock_out&amp;sale_id=' . h($sale['id']) . '">Siparişi görüntüle</a>'];
+            '<a href="stock_out.php&amp;sale_id=' . h($sale['id']) . '">Siparişi görüntüle</a>'];
     }
     table(['Satış', 'Tarih', 'Müşteri', 'Vade', 'Satış Tutarı', 'Bekleyen Adet', ''], $data,
         ['money' => [4], 'int' => [5], 'raw' => [6 => true]]);
@@ -45,7 +46,7 @@ $sale = row('SELECT s.*, c.ad musteri, c.tip FROM sales s JOIN customers c ON c.
 if (!$sale) {
     http_response_code(404);
     layout_head('Satış Bulunamadı', 'stock_out');
-    echo '<p>Satış kaydı bulunamadı.</p><a href="?p=stock_out">Teslimat bekleyen satışlara dön</a>';
+    echo '<p>Satış kaydı bulunamadı.</p><a href="stock_out.php">Teslimat bekleyen satışlara dön</a>';
     layout_foot();
     return;
 }
@@ -54,7 +55,7 @@ $items = rows('SELECT si.id, si.adet, si.birim_fiyat, si.toplam, b.kod, b.ad kit
     ' JOIN books b ON b.id = si.book_id WHERE si.sale_id = ? ORDER BY si.id', [$saleId]);
 $currentPersonId = current_person_id();
 layout_head('Satış #' . $saleId . ' · Teslimat', 'stock_out');
-echo '<p><a href="?p=stock_out">← Teslimat bekleyen satışlara dön</a></p>';
+echo '<p><a href="stock_out.php">← Teslimat bekleyen satışlara dön</a></p>';
 echo '<div class="card"><strong>Müşteri:</strong> ' . h($sale['musteri'] . ' (' . $sale['tip'] . ')') .
     '<br><strong>Satış tarihi:</strong> ' . h(dtr($sale['tarih'])) .
     ' · <strong>Vade:</strong> ' . h(dtr($sale['vade_tarihi'])) .
@@ -77,7 +78,7 @@ if (!$pending) {
     return;
 }
 if ($currentPersonId === null) {
-    echo '<p>Teslimat kaydı için önce <a href="?p=account&amp;return=stock_out&amp;sale_id=' . h($saleId) . '">hesabınızı kişi kaydınızla eşleştirin</a>.</p>';
+    echo '<p>Teslimat kaydı için önce <a href="account.php&amp;return=stock_out&amp;sale_id=' . h($saleId) . '">hesabınızı kişi kaydınızla eşleştirin</a>.</p>';
     layout_foot();
     return;
 }
@@ -88,7 +89,7 @@ if ($currentPersonId === null) {
   <h2>Teslimat Kaydı</h2>
   <label>Teslim Tarihi<input type="date" name="tarih" value="<?= date('Y-m-d') ?>" required></label>
   <label>Götüren Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
-  <a href="?p=people">Kişileri yönet</a>
+  <a href="people.php">Kişileri yönet</a>
   <label>Teslim Edilen Kişi<input name="teslim_edilen" maxlength="200" required></label>
   <button>Teslimatı Kaydet</button>
 </form>

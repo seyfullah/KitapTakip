@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 /**
  * SQLite'dan MariaDB/MySQL'e Veri Taşıma Script
  * 

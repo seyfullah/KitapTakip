@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 require __DIR__ . '/_stock_action.php';
 layout_head('Stok Giriş Hareketleri', 'stock_in_history');
 $data = [];

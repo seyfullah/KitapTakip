@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 $defs = report_defs();
 $key = get('r', 'kitap'); if (!isset($defs[$key])) $key = 'kitap';
 $f = ['from' => get('from'), 'to' => get('to'), 'customer_id' => get('customer_id'), 'book_id' => get('book_id')];

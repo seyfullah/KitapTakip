@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $id = (int) post('stock_in_id');
@@ -43,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) {
         flash($e->getMessage());
     }
-    redirect('?p=uy_supplier_payments');
+    redirect('supplier_payments.php');
 }
 
 $purchases = supplier_purchase_rows();

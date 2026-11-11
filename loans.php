@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = post('act');
     if ($act === 'delete_payment') {
@@ -44,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     after_write();
-    redirect('?p=uy_loans');
+    redirect('loans.php');
 }
 
 layout_head('Alınan Borçlar', 'uy_loans');

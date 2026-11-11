@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 $from = get('from');
 $to = get('to');
 $summary = financial_summary($from, $to);
@@ -18,7 +19,7 @@ $data = [
     ['Net kâr / zarar', $summary['profit']],
 ];
 table(['Kalem', 'Tutar'], $data, ['money' => [1]]);
-echo '<div class="cards"><div class="kpi"><small>Kalan Borç</small><div>' . money($summary['debt']) . '</div><a href="?p=uy_loans">Borçları görüntüle</a></div><div class="kpi"><small>Bağış</small><div>' . money($summary['uy_donations']) . '</div><a href="?p=uy_donations">Bağış kaydet</a></div><div class="kpi"><small>Gider</small><div>' . money($summary['uy_expenses']) . '</div><a href="?p=uy_expenses">Gider kaydet</a></div></div>';
-echo '<div class="cards"><div class="kpi"><small>Tedarikçiye Kalan Borç</small><div>' . money($supplier['debt']) . '</div><a href="?p=uy_supplier_payments">Ödemeleri görüntüle</a></div><div class="kpi"><small>Tedarikçiden Alacak</small><div>' . money($supplier['credit']) . '</div><a href="?p=uy_supplier_payments">Alışları görüntüle</a></div></div>';
+echo '<div class="cards"><div class="kpi"><small>Kalan Borç</small><div>' . money($summary['debt']) . '</div><a href="uy_loans.php">Borçları görüntüle</a></div><div class="kpi"><small>Bağış</small><div>' . money($summary['uy_donations']) . '</div><a href="uy_donations.php">Bağış kaydet</a></div><div class="kpi"><small>Gider</small><div>' . money($summary['uy_expenses']) . '</div><a href="uy_expenses.php">Gider kaydet</a></div></div>';
+echo '<div class="cards"><div class="kpi"><small>Tedarikçiye Kalan Borç</small><div>' . money($supplier['debt']) . '</div><a href="uy_supplier_payments.php">Ödemeleri görüntüle</a></div><div class="kpi"><small>Tedarikçiden Alacak</small><div>' . money($supplier['credit']) . '</div><a href="uy_supplier_payments.php">Alışları görüntüle</a></div></div>';
 echo '<p class="muted">Kitap maliyeti satış anındaki kitap kartı alış fiyatından alınır; eski satışların maliyeti geçiş sırasında güncel alış fiyatıyla yaklaşık doldurulur. Borç ve anapara ödemeleri kâr/zarardan ayrı izlenir; tedarikçi iadeleri stoktan düşülür.</p>';
 layout_foot();

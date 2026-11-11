@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 $returnPage = $_SERVER['REQUEST_METHOD'] === 'POST' ? post('return') : get('return');
 if (!in_array($returnPage, ['stock_in', 'stock_out'], true)) $returnPage = '';
 $saleId = (int) ($_SERVER['REQUEST_METHOD'] === 'POST' ? post('sale_id') : get('sale_id'));
@@ -27,7 +28,7 @@ layout_head('Hesabım', 'account');
   <input type="hidden" name="sale_id" value="<?= h($saleId) ?>">
   <label>Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM uy_people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
   <button>Kaydet</button>
-  <a href="?p=people">Kişileri yönet</a>
+  <a href="people.php">Kişileri yönet</a>
 </form>
 <?php layout_foot(); ?>
 

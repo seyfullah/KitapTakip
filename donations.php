@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('act') === 'delete') {
         q('DELETE FROM uy_donations WHERE id = ?', [(int) post('id')]);
@@ -13,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     after_write();
-    redirect('?p=uy_donations');
+    redirect('donations.php');
 }
 layout_head('Bağış Kaydı', 'uy_donations'); ?>
 <form method="post" class="f no-print">

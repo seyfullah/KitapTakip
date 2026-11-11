@@ -65,5 +65,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             flash($e->getMessage());
         }
     }
-    redirect('?p=' . $target);
+    // Map target names to page files
+    $pageMap = [
+        'uy_stock_in' => 'stock_in.php',
+        'stock_in_history' => 'stock_in_history.php',
+        'stock_current' => 'stock_current.php',
+    ];
+    redirect($pageMap[$target] ?? 'stock_current.php');
 }

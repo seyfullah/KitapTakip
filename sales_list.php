@@ -1,9 +1,10 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('act') === 'view') {
         $id = (int) post('id');
         $s = row('SELECT * FROM uy_sales WHERE id = ?', [$id]);
-        if (!$s) { flash('Satış bulunamadı.'); redirect('?p=sales_list'); }
+        if (!$s) { flash('Satış bulunamadı.'); redirect('sales_list.php'); }
         layout_head('Satış Detayı', 'sales_list');
         echo '<div class="card">';
         echo '<div class="f" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem"><label>No<strong>#' . $s['id'] . '</strong></label>';
@@ -20,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo '<tr><td>' . h($item['ad']) . '</td><td class="r">' . $item['adet'] . '</td><td class="r">' . fmt($item['birim_fiyat']) . '</td><td class="r">' . fmt($item['toplam']) . '</td></tr>';
         }
         echo '</tbody></table></div>';
-        echo '<p><a href="?p=sales_list" class="btn">Geri</a></p>';
+        echo '<p><a href="sales_list.php" class="btn">Geri</a></p>';
         echo '</div>';
         layout_foot();
         exit;

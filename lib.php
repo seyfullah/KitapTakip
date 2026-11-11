@@ -817,13 +817,13 @@ function layout_head(string $title, string $page): void {
     $currentUser = row('SELECT kullanici FROM uy_users WHERE id = ?', [(int) ($_SESSION['uid'] ?? 0)]);
     $userDisplay = $currentUser ? h($currentUser['kullanici']) : '';
     echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><b class="brand">📚 Kitap Cari</b><div class="nav-groups">';
-    echo '<a href="?p=dashboard"' . ($page === 'dashboard' ? ' class="on" aria-current="page"' : '') . '>Panel</a>';
+    echo '<a href="dashboard.php"' . ($page === 'dashboard' ? ' class="on" aria-current="page"' : '') . '>Panel</a>';
     foreach ($groups as $label => $items) {
         echo '<details class="nav-menu"><summary' . (isset($items[$page]) ? ' class="on"' : '') . '>' . h($label) . '</summary><div class="nav-links">';
-        foreach ($items as $k => $v) echo '<a href="?p=' . $k . '"' . ($k === $page ? ' class="on" aria-current="page"' : '') . '>' . h($v) . '</a>';
+        foreach ($items as $k => $v) echo '<a href="' . $k . '.php"' . ($k === $page ? ' class="on" aria-current="page"' : '') . '>' . h($v) . '</a>';
         echo '</div></details>';
     }
-    echo '</div><div class="nav-user"><span class="username">' . $userDisplay . '</span><a href="?p=logout" class="logout">Çıkış</a></div></nav><main>';
+    echo '</div><div class="nav-user"><span class="username">' . $userDisplay . '</span><a href="logout.php" class="logout">Çıkış</a></div></nav><main>';
     if ($m = flash()) echo '<div class="flash">' . h($m) . '</div>';
     echo '<h1>' . h($title) . '</h1>';
 }

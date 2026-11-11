@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 layout_head('Güncel Stok', 'stock_current');
 $crit = array_filter(stock_report(), fn($s) => $s['stok'] <= $s['kritik_stok']);
 if ($crit) echo '<div class="flash err"><b>⚠ Kritik stok uyarısı:</b> ' . h(implode(', ', array_map(fn($s) => $s['ad'] . ' (' . $s['stok'] . ')', $crit))) . '</div>';

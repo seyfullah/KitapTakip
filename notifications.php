@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 $configured = reminder_channels_configured();
 $localOnly = cfg('app_storage') === 'sqlite';
 layout_head('Haftalık Alacak Bildirimleri', 'notifications');

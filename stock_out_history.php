@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 layout_head('Teslimat ve Eski Çıkış Hareketleri', 'stock_out_history');
 $deliveries = [];
 foreach (rows('SELECT d.*, s.id satis_no, c.ad musteri, b.kod, b.ad kitap FROM uy_sale_deliveries d

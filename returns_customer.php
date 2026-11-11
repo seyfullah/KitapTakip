@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $itemId = (int) post('sale_item_id');
     $item = row('SELECT si.*, s.tarih satis_tarihi, s.id satis_no, c.ad musteri
@@ -33,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) {
         flash($e->getMessage());
     }
-    redirect('?p=returns_customer');
+    redirect('returns_customer.php');
 }
 
 layout_head('Müşteri İadesi', 'returns_customer');
@@ -53,7 +54,7 @@ $items = rows("SELECT si.id, s.id satis_no, s.tarih satis_tarihi, c.ad musteri, 
   <label>Açıklama<input name="aciklama"></label>
   <button>İadeyi Kaydet</button>
 </form>
-<p class="muted">Teslim edilmiş kitaplar iade alınabilir. İade bedeli satıştaki birim fiyattan hesaplanır; müşterinin cari bakiyesinden düşülür ve ürün stoğa eklenir. Eski bağımsız çıkışlar için <a href="?p=returns_stock_out">Stok Çıkış İadesi</a> ekranını kullanın.</p>
+<p class="muted">Teslim edilmiş kitaplar iade alınabilir. İade bedeli satıştaki birim fiyattan hesaplanır; müşterinin cari bakiyesinden düşülür ve ürün stoğa eklenir. Eski bağımsız çıkışlar için <a href="returns_stock_out.php">Stok Çıkış İadesi</a> ekranını kullanın.</p>
 <?php
 $data = [];
 foreach (rows('SELECT cr.*, s.id satis_no, c.ad musteri, b.kod, b.ad kitap FROM uy_customer_returns cr JOIN uy_sale_items si ON si.id = cr.sale_item_id JOIN uy_sales s ON s.id = si.sale_id JOIN uy_customers c ON c.id = s.customer_id JOIN uy_books b ON b.id = si.book_id ORDER BY cr.tarih DESC, cr.id DESC LIMIT 200') as $r)

@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('act') === 'delete') { q('DELETE FROM uy_payments WHERE id = ?', [(int) post('id')]); flash('Tahsilat silindi.'); }
     else {
@@ -6,7 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!(int) post('customer_id') || $tutar <= 0) flash('Müşteri ve pozitif tutar zorunludur.');
         else { q('INSERT INTO uy_payments (customer_id, tarih, tutar, yontem, aciklama) VALUES (?,?,?,?,?)', [(int) post('customer_id'), post('tarih', date('Y-m-d')), $tutar, post('yontem'), post('aciklama')]); flash('Tahsilat kaydedildi.'); }
     }
-    after_write(); redirect('?p=uy_payments');
+    after_write(); redirect('payments.php');
 }
 layout_head('Tahsilat Girişi', 'uy_payments'); ?>
 <form method="post" class="f no-print">

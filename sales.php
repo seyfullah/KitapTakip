@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (post('act') === 'delete') {
         $id = (int) post('id');
@@ -9,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q('DELETE FROM uy_sales WHERE id = ?', [$id]);
             flash('Satış silindi, stok geri eklendi.'); after_write();
         }
-        redirect('?p=sales');
+        redirect('sales.php');
     }
     $cid = (int) post('customer_id'); $tarih = post('tarih', date('Y-m-d'));
     $vade = post('vade_tarihi') ?: date('Y-m-d', strtotime($tarih . ' +' . (int) post('vade_gun', '0') . ' days'));
@@ -20,13 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rawAdet = trim((string) ($_POST['adet'][$i] ?? ''));
         if ($rawAdet === '' || $rawAdet === '0') continue;
         try { $adet = stock_quantity($rawAdet); }
-        catch (DomainException $e) { flash($e->getMessage()); redirect('?p=uy_sales'); }
+        catch (DomainException $e) { flash($e->getMessage()); redirect('sales.php'); }
         $fiyat = trim((string) ($_POST['fiyat'][$i] ?? '')) !== '' ? dec($_POST['fiyat'][$i]) : (float) $b['satis_fiyati'];
         $lines[] = [$bid, $adet, $fiyat, (float) $b['alis_fiyati'], round($adet * $fiyat, 2)];
         $need[$bid] = ($need[$bid] ?? 0) + $adet;
     }
     if (!$cid || !$lines) $err = 'Müşteri ve en az bir kitap satırı zorunludur.';
-    if ($err) { flash(trim($err)); redirect('?p=uy_sales'); }
+    if ($err) { flash(trim($err)); redirect('sales.php'); }
     $pdo = db(); $pdo->beginTransaction();
     try {
         $bookIds = array_keys($need);
@@ -41,10 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($lines as $l) q('INSERT INTO uy_sale_items (sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?)', [$sid, ...$l]);
         $pdo->commit();
     } catch (DomainException $e) {
-        $pdo->rollBack(); flash($e->getMessage()); redirect('?p=sales');
+        $pdo->rollBack(); flash($e->getMessage()); redirect('sales.php');
     } catch (Throwable $t) { $pdo->rollBack(); throw $t; }
     flash("Satış #$sid kaydedildi, stoktan düşüldü."); after_write();
-    redirect('?p=sales');
+    redirect('sales.php');
 }
 
 layout_head('Satış Kayıt', 'sales');

@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $outId = (int) post('stock_out_id');
@@ -28,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) {
         flash($e->getMessage());
     }
-    redirect('?p=returns_stock_out');
+    redirect('returns_stock_out.php');
 }
 
 layout_head('Stok Çıkış İadesi', 'returns_stock_out');
@@ -45,7 +46,7 @@ $outs = rows('SELECT o.id, o.tarih, o.adet, c.ad musteri, b.kod, b.ad kitap, COA
   <label>Açıklama<input name="aciklama"></label>
   <button>İadeyi Kaydet</button>
 </form>
-<p class="muted">İade stoğa eklenir; satışa bağlı olmayan bu hareket cari bakiye veya kâr/zararı değiştirmez. Satış iadeleri için <a href="?p=returns_customer">Müşteri İadesi</a> ekranını kullanın.</p>
+<p class="muted">İade stoğa eklenir; satışa bağlı olmayan bu hareket cari bakiye veya kâr/zararı değiştirmez. Satış iadeleri için <a href="returns_customer.php">Müşteri İadesi</a> ekranını kullanın.</p>
 <?php
 $data = [];
 foreach (rows('SELECT r.*, o.id cikis_no, c.ad musteri, b.kod, b.ad kitap

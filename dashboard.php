@@ -1,4 +1,5 @@
-<?php
+<?php require '_init.php';
+
 $stock = stock_report();
 $totStock = array_sum(array_column($stock, 'stok'));
 $finance = financial_summary();

@@ -1,14 +1,15 @@
-<?php
+<?php require '_init.php';
+
 if (get('only') && isset(report_defs()[get('only')])) { $k = get('only'); xlsx_download("rapor_$k.xlsx", [report_defs()[$k] => report($k)]); }
 if (get('xlsx')) xlsx_download('kitap_cari_' . date('Ymd_His') . '.xlsx', export_sets());
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('act') === 'gsync') {
     try { flash('Google Sheets güncellendi (' . gs_sync() . ' sekme).'); } catch (Throwable $e) { flash($e->getMessage()); }
-    redirect('?p=export');
+    redirect('export.php');
 }
 layout_head('Excel ve Google Sheets', 'export'); ?>
 <div class="card"><h2>Excel</h2>
   <p>Kitaplar, müşteriler, stok girişleri, satışlar, tahsilatlar, güncel stok, cari özet, müşteri detay ve vadesi geçmiş alacaklar tek bir .xlsx dosyasında ayrı sekmeler olarak indirilir.</p>
-  <a class="btn" href="?p=export&xlsx=1">⬇ Excel (.xlsx) indir</a></div>
+  <a class="btn" href="export.php&xlsx=1">⬇ Excel (.xlsx) indir</a></div>
 <div class="card"><h2>Google Sheets</h2>
 <?php if (gs_configured()): ?>
   <p>Tablo: <a target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/<?= h(cfg('gsheets_id')) ?>">aç</a> · Otomatik besleme: <?= cfg('gsheets_auto') ? '<b>açık</b>' : 'kapalı (GSHEETS_AUTO=1 ile açılır)' ?></p>
