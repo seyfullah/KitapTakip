@@ -5,16 +5,12 @@ $saleId = (int) ($_SERVER['REQUEST_METHOD'] === 'POST' ? post('sale_id') : get('
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $personId = (int) post('person_id');
-    if (!row('SELECT id FROM people WHERE id = ?', [$personId])) {
+    if (!row('SELECT id FROM uy_people WHERE id = ?', [$personId])) {
         flash('Kişi listesinden geçerli bir kayıt seçin.');
         $params = ['p' => 'account', 'return' => $returnPage, 'sale_id' => $saleId];
         redirect('?' . http_build_query($params));
     }
-    if (cfg('app_storage') === 'sqlite') {
-        q('INSERT INTO user_people (user_id, person_id) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET person_id = excluded.person_id', [(int) $_SESSION['uid'], $personId]);
-    } else {
-        q('INSERT INTO user_people (user_id, person_id) VALUES (?,?) ON DUPLICATE KEY UPDATE person_id = VALUES(person_id)', [(int) $_SESSION['uid'], $personId]);
-    }
+    q('UPDATE uy_users SET person_id = ? WHERE id = ?', [$personId, (int) $_SESSION['uid']]);
     flash('Hesabınız kişi kaydıyla eşleştirildi.');
     $params = ['p' => $returnPage ?: 'account'];
     if ($returnPage === 'stock_out' && $saleId > 0) $params['sale_id'] = $saleId;
@@ -29,8 +25,9 @@ layout_head('Hesabım', 'account');
   <input type="hidden" name="_csrf" value="<?= csrf() ?>">
   <input type="hidden" name="return" value="<?= h($returnPage) ?>">
   <input type="hidden" name="sale_id" value="<?= h($saleId) ?>">
-  <label>Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
+  <label>Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM uy_people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
   <button>Kaydet</button>
   <a href="?p=people">Kişileri yönet</a>
 </form>
 <?php layout_foot(); ?>
+

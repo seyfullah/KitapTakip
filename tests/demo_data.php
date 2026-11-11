@@ -24,10 +24,10 @@ try {
     if ($run() !== 0) throw new RuntimeException('Demo kurulumu başarısız.');
     $pdo = new PDO('sqlite:' . $path);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $tables = ['users', 'people', 'user_people', 'books', 'customers', 'stock_in', 'supplier_purchases',
-        'supplier_payments', 'stock_out', 'stock_out_returns', 'sales', 'sale_items', 'sale_deliveries',
-        'legacy_sale_returns', 'customer_returns', 'supplier_returns', 'supplier_return_links',
-        'payments', 'expenses', 'donations', 'loans', 'loan_payments', 'notification_log'];
+    $tables = ['uy_users', 'uy_people', 'uy_books', 'uy_customers', 'uy_stock_in', 'uy_supplier_purchases',
+        'uy_supplier_payments', 'uy_stock_out', 'uy_stock_out_returns', 'uy_sales', 'uy_sale_items', 'uy_sale_deliveries',
+        'uy_legacy_sale_returns', 'uy_customer_returns', 'uy_supplier_returns', 'uy_supplier_return_links',
+        'uy_payments', 'uy_expenses', 'uy_donations', 'uy_loans', 'uy_loan_payments', 'uy_notification_log'];
     foreach ($tables as $table) {
         if ((int) $pdo->query("SELECT COUNT(*) FROM $table")->fetchColumn() < 3) throw new RuntimeException("$table tablosunda üç kayıt yok.");
     }

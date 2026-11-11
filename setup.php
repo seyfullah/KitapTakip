@@ -63,7 +63,7 @@ echo 'Sunucu: ' . php_uname('s') . '<br>';
 echo 'Çalışan Kullanıcı: ' . get_current_user() . '<br>';
 echo '</div>';
 
-// 1. Konfigürasyon dosyası kontrol
+// 1. Konfigürasyon dosyası kontrol (lib.php OLMADAN)
 echo '<h2>Adım 1: Konfigürasyon</h2>';
 echo '<div class="progress"><div class="step">';
 
@@ -71,18 +71,20 @@ if (is_file(__DIR__ . '/config.php')) {
     echo '✅ config.php mevcut';
     try {
         $cfg = require __DIR__ . '/config.php';
-        require __DIR__ . '/lib.php';
         echo '</div><div class="status ok">✅ Konfigürasyon yüklendi<br>';
-        echo 'Depolama: ' . cfg('app_storage') . '<br>';
-        if (cfg('app_storage') === 'sqlite') {
-            echo 'SQLite dosyası: ' . cfg('app_data_file') . '<br>';
-            $data_dir = dirname(cfg('app_data_file'));
-            echo 'Veri klasörü: ' . $data_dir . '<br>';
-            echo 'Klasör izinleri: ' . substr(sprintf('%o', fileperms($data_dir)), -4) . '<br>';
+        echo 'Depolama: ' . ($cfg['app_storage'] ?? 'sqlite') . '<br>';
+        if (($cfg['app_storage'] ?? 'sqlite') === 'sqlite') {
+            $data_file = $cfg['app_data_file'] ?? dirname(__DIR__) . '/kitaptakip-data/kitaptakip.sqlite';
+            echo 'SQLite dosyası: ' . htmlspecialchars($data_file) . '<br>';
+            $data_dir = dirname($data_file);
+            echo 'Veri klasörü: ' . htmlspecialchars($data_dir) . '<br>';
+            if (is_dir($data_dir)) {
+                echo 'Klasör izinleri: ' . substr(sprintf('%o', fileperms($data_dir)), -4) . '<br>';
+            }
         }
         echo '</div>';
     } catch (Exception $e) {
-        echo '</div><div class="status error">❌ Hata: ' . h($e->getMessage()) . '</div>';
+        echo '</div><div class="status error">❌ Hata: ' . htmlspecialchars($e->getMessage()) . '</div>';
         exit;
     }
 } else {
@@ -95,21 +97,21 @@ if (is_file(__DIR__ . '/config.php')) {
 echo '<h2>Adım 2: SQLite Dosyası</h2>';
 echo '<div class="progress"><div class="step">';
 
-if (cfg('app_storage') === 'sqlite') {
-    $data_file = cfg('app_data_file');
+if (($cfg['app_storage'] ?? 'sqlite') === 'sqlite') {
+    $data_file = $cfg['app_data_file'] ?? dirname(__DIR__) . '/kitaptakip-data/kitaptakip.sqlite';
     $data_dir = dirname($data_file);
     
     // Klasör var mı?
     if (!is_dir($data_dir)) {
         echo '📁 Veri klasörü yok, oluşturuluyor...' . "</div>\n";
         if (@mkdir($data_dir, 0755, true)) {
-            echo '<div class="status ok">✅ Klasör oluşturuldu: ' . h($data_dir) . '</div>';
+            echo '<div class="status ok">✅ Klasör oluşturuldu: ' . htmlspecialchars($data_dir) . '</div>';
         } else {
-            echo '<div class="status error">❌ Klasör oluşturulamadı. FTP yoluyla oluşturun: ' . h($data_dir) . '</div>';
+            echo '<div class="status error">❌ Klasör oluşturulamadı. FTP yoluyla oluşturun: ' . htmlspecialchars($data_dir) . '</div>';
             exit;
         }
     } else {
-        echo '✅ Klasör mevcut: ' . h($data_dir) . "</div>\n";
+        echo '✅ Klasör mevcut: ' . htmlspecialchars($data_dir) . "</div>\n";
         echo '<div class="status ok">' . (is_writable($data_dir) ? '✅ Yazılabilir' : '⚠️ Yazı izni yok') . '</div>';
     }
     
@@ -124,7 +126,7 @@ if (cfg('app_storage') === 'sqlite') {
             $pdo = null;
             echo '<div class="status ok">✅ Dosya oluşturuldu</div>';
         } catch (Exception $e) {
-            echo '<div class="status error">❌ Dosya oluşturulamadı: ' . h($e->getMessage()) . '</div>';
+            echo '<div class="status error">❌ Dosya oluşturulamadı: ' . htmlspecialchars($e->getMessage()) . '</div>';
             exit;
         }
     }
@@ -138,7 +140,9 @@ echo '<h2>Adım 3: Veritabanı Şeması</h2>';
 echo '<div class="progress"><div class="step">';
 
 try {
-    $pdo = db();
+    // lib.php'yi YÖK require etmeden doğrudan PDO aç
+    $data_file = $cfg['app_data_file'] ?? dirname(__DIR__) . '/kitaptakip-data/kitaptakip.sqlite';
+    $pdo = new PDO("sqlite:$data_file", null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $table_count = $pdo->query("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'uy_%'")->fetchColumn();
     
     if ($table_count > 0) {
@@ -147,21 +151,23 @@ try {
     } else {
         echo "📊 Tablolar oluşturuluyor...</div>\n";
         
-        // Schema dosyasını yükle
-        $schema_file = __DIR__ . '/sql/schema' . (cfg('app_storage') === 'sqlite' ? '.sqlite' : '') . '.sql';
+        // Schema dosyasını yükle ve migrasyonları çalıştır
+        $schema_file = __DIR__ . '/sql/schema.sqlite.sql';
         
         if (!is_file($schema_file)) {
-            echo '<div class="status error">❌ Schema dosyası bulunamadı: ' . h($schema_file) . '</div>';
+            echo '<div class="status error">❌ Schema dosyası bulunamadı: ' . htmlspecialchars($schema_file) . '</div>';
             exit;
         }
         
-        $schema = file_get_contents($schema_file);
-        $pdo->exec($schema);
+        // PRAGMA user_version sıfır olduğundan, lib.php'deki sqlite_upgrade() işlevini çalıştır
+        // (Bunu buraya inline yazacağız çünkü lib.php henüz yüklü değil)
+        require_once __DIR__ . '/lib.php';
+        sqlite_upgrade($pdo);
         
         echo '<div class="status ok">✅ Tablolar oluşturuldu</div>';
     }
 } catch (Exception $e) {
-    echo '</div><div class="status error">❌ Veritabanı hatası: ' . h($e->getMessage()) . '</div>';
+    echo '</div><div class="status error">❌ Veritabanı hatası: ' . htmlspecialchars($e->getMessage()) . '</div>';
     exit;
 }
 
@@ -170,19 +176,22 @@ echo '<h2>Adım 4: Admin Kullanıcısı</h2>';
 echo '<div class="progress"><div class="step">';
 
 try {
-    $admin_exists = (bool) val('SELECT id FROM uy_users WHERE kullanici = ?', ['admin']);
+    // lib.php olmadan doğrudan SQL sorgusu yapacağız
+    $stmt = $pdo->prepare('SELECT id FROM uy_users WHERE kullanici = ?');
+    $stmt->execute(['admin']);
+    $admin_exists = (bool) $stmt->fetchColumn();
     
     if ($admin_exists) {
         echo '✅ Admin kullanıcısı mevcut</div>';
         echo '<div class="status info">admin / admin123 ile giriş yapabilirsiniz</div>';
     } else {
         echo '👤 Admin kullanıcısı oluşturuluyor...</div>';
-        q('INSERT INTO uy_users (kullanici, sifre_hash) VALUES (?, ?)', 
-            ['admin', password_hash('admin123', PASSWORD_DEFAULT)]);
+        $stmt = $pdo->prepare('INSERT INTO uy_users (kullanici, sifre_hash) VALUES (?, ?)');
+        $stmt->execute(['admin', password_hash('admin123', PASSWORD_DEFAULT)]);
         echo '<div class="status ok">✅ Admin kullanıcısı oluşturuldu<br>Kullanıcı: <code>admin</code><br>Şifre: <code>admin123</code></div>';
     }
 } catch (Exception $e) {
-    echo '</div><div class="status error">❌ Kullanıcı oluşturma hatası: ' . h($e->getMessage()) . '</div>';
+    echo '</div><div class="status error">❌ Kullanıcı oluşturma hatası: ' . htmlspecialchars($e->getMessage()) . '</div>';
     exit;
 }
 
@@ -196,7 +205,7 @@ echo '</div>';
 echo '<div class="warning">';
 echo '<strong>⚠️ ÖNEMLİ: Bu dosyayı silin!</strong><br>';
 echo 'Güvenlik için bu dosya (<code>setup.php</code>) silinmelidir.<br>';
-echo 'FTP yoluyla silelebilir veya sunucu panelinden rimraf komutu ile silinebilir.';
+echo 'FTP yoluyla silebilir veya sunucu panelinden File Manager ile silinebilir.';
 echo '</div>';
 
 echo '</div></body></html>';

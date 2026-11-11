@@ -2,7 +2,7 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) post('id');
     if (post('act') === 'delete') {
-        if ((int) val('SELECT COUNT(*) FROM user_people WHERE person_id = ?', [$id])) {
+        if ((int) val('SELECT COUNT(*) FROM uy_users WHERE person_id = ?', [$id])) {
             flash('Bir kullanıcı hesabıyla eşleşen kişi silinemez.');
         } else {
             q('DELETE FROM uy_people WHERE id = ?', [$id]);

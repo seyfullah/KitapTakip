@@ -4,7 +4,7 @@ declare(strict_types=1);
 function cfg(string $k) { static $c; $c ??= require __DIR__ . '/config.php'; return $c[$k] ?? null; }
 
 function sqlite_upgrade(PDO $pdo): void {
-    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 7) return;
+    if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() >= 8) return;
 
     $pdo->exec('BEGIN IMMEDIATE');
     try {
@@ -63,7 +63,7 @@ function sqlite_upgrade(PDO $pdo): void {
             $pdo->exec('PRAGMA user_version = 5');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 6) {
-            $pdo->exec('CREATE TABLE IF NOT EXISTS user_people (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, person_id INTEGER NOT NULL REFERENCES people(id))');
+            $pdo->exec('CREATE TABLE IF NOT EXISTS uy_user_people (user_id INTEGER PRIMARY KEY REFERENCES uy_users(id) ON DELETE CASCADE, person_id INTEGER NOT NULL REFERENCES uy_people(id))');
             $pdo->exec('PRAGMA user_version = 6');
         }
         if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 7) {
@@ -72,6 +72,15 @@ function sqlite_upgrade(PDO $pdo): void {
                 $pdo->exec("ALTER TABLE uy_sales ADD COLUMN durum TEXT NOT NULL DEFAULT 'Yeni'");
             }
             $pdo->exec('PRAGMA user_version = 7');
+        }
+        if ((int) $pdo->query('PRAGMA user_version')->fetchColumn() < 8) {
+            $columns = array_column($pdo->query("PRAGMA table_info(uy_users)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+            if (!in_array('person_id', $columns, true)) {
+                $pdo->exec('ALTER TABLE uy_users ADD COLUMN person_id INTEGER REFERENCES uy_people(id) ON DELETE SET NULL');
+            }
+            $pdo->exec('UPDATE uy_users SET person_id = (SELECT person_id FROM uy_user_people WHERE uy_user_people.user_id = uy_users.id) WHERE id IN (SELECT DISTINCT user_id FROM uy_user_people)');
+            $pdo->exec('DROP TABLE IF EXISTS uy_user_people');
+            $pdo->exec('PRAGMA user_version = 8');
         }
         $pdo->exec('COMMIT');
     } catch (Throwable $e) {
@@ -129,7 +138,7 @@ function row(string $sql, array $p = []): ?array { return q($sql, $p)->fetch() ?
 function val(string $sql, array $p = []) { $r = q($sql, $p)->fetch(PDO::FETCH_NUM); return $r ? $r[0] : null; }
 
 function current_person_id(): ?int {
-    $person = val('SELECT person_id FROM user_people WHERE user_id = ?', [(int) ($_SESSION['uid'] ?? 0)]);
+    $person = val('SELECT person_id FROM uy_users WHERE id = ?', [(int) ($_SESSION['uid'] ?? 0)]);
     return $person === null ? null : (int) $person;
 }
 
@@ -805,6 +814,8 @@ function layout_head(string $title, string $page): void {
         'Finans' => ['expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'finance' => 'Kâr / Zarar'],
         'Diğer' => ['notifications' => 'Bildirimler', 'reports' => 'Raporlar', 'export' => 'Excel / Sheets'],
     ];
+    $currentUser = row('SELECT kullanici FROM uy_users WHERE id = ?', [(int) ($_SESSION['uid'] ?? 0)]);
+    $userDisplay = $currentUser ? h($currentUser['kullanici']) : '';
     echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><b class="brand">📚 Kitap Cari</b><div class="nav-groups">';
     echo '<a href="?p=dashboard"' . ($page === 'dashboard' ? ' class="on" aria-current="page"' : '') . '>Panel</a>';
     foreach ($groups as $label => $items) {
@@ -812,7 +823,7 @@ function layout_head(string $title, string $page): void {
         foreach ($items as $k => $v) echo '<a href="?p=' . $k . '"' . ($k === $page ? ' class="on" aria-current="page"' : '') . '>' . h($v) . '</a>';
         echo '</div></details>';
     }
-    echo '</div><a href="?p=logout" class="out">Çıkış</a></nav><main>';
+    echo '</div><div class="nav-user"><span class="username">' . $userDisplay . '</span><a href="?p=logout" class="logout">Çıkış</a></div></nav><main>';
     if ($m = flash()) echo '<div class="flash">' . h($m) . '</div>';
     echo '<h1>' . h($title) . '</h1>';
 }

@@ -1,9 +1,9 @@
 <?php
 // Demo veri yalnızca boş bir uygulama veritabanına eklenir.
-$demoTables = ['people', 'user_people', 'books', 'customers', 'stock_in', 'supplier_purchases', 'supplier_payments',
-    'stock_out', 'stock_out_returns', 'sales', 'sale_items', 'sale_deliveries', 'legacy_sale_returns',
-    'customer_returns', 'supplier_returns', 'supplier_return_links', 'payments', 'expenses', 'donations',
-    'loans', 'loan_payments', 'notification_log'];
+$demoTables = ['uy_people', 'uy_books', 'uy_customers', 'uy_stock_in', 'uy_supplier_purchases', 'uy_supplier_payments',
+    'uy_stock_out', 'uy_stock_out_returns', 'uy_sales', 'uy_sale_items', 'uy_sale_deliveries', 'uy_legacy_sale_returns',
+    'uy_customer_returns', 'uy_supplier_returns', 'uy_supplier_return_links', 'uy_payments', 'uy_expenses', 'uy_donations',
+    'uy_loans', 'uy_loan_payments', 'uy_notification_log'];
 foreach ($demoTables as $table) {
     if ((int) val("SELECT COUNT(*) FROM $table") > 0) {
         echo "Veritabanında kayıt var; örnek veriler eklenmedi.\n";
@@ -17,39 +17,38 @@ try {
     $people = ['Demo kullanıcısı', 'Ayşe Örnek', 'Mehmet Örnek'];
     $personIds = [];
     foreach ($people as $person) {
-        q('INSERT INTO people (ad) VALUES (?)', [$person]);
+        q('INSERT INTO uy_people (ad) VALUES (?)', [$person]);
         $personIds[] = (int) $pdo->lastInsertId();
     }
-    $users = rows('SELECT id FROM users WHERE kullanici = ?', [$u]);
+    $users = rows('SELECT id FROM uy_users WHERE kullanici = ?', [$u]);
     $userId = (int) $users[0]['id'];
-    q('INSERT INTO user_people (user_id, person_id) VALUES (?,?)', [$userId, $personIds[0]]);
+    q('UPDATE uy_users SET person_id = ? WHERE id = ?', [$personIds[0], $userId]);
     for ($i = 1; $i < 3; $i++) {
         $username = 'demo_' . bin2hex(random_bytes(8));
-        q('INSERT INTO users (kullanici, sifre_hash) VALUES (?,?)', [$username, password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT)]);
-        q('INSERT INTO user_people (user_id, person_id) VALUES (?,?)', [(int) $pdo->lastInsertId(), $personIds[$i]]);
+        q('INSERT INTO uy_users (kullanici, sifre_hash, person_id) VALUES (?,?,?)', [$username, password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $personIds[$i]]);
     }
     $bookIds = [];
     foreach ([['MAT5', 'Matematik 5', 90, 150, 100], ['TRK6', 'Türkçe 6', 95, 170, 80], ['FEN7', 'Fen Bilimleri 7', 100, 180, 60]] as $book) {
-        q('INSERT INTO books (kod, ad, alis_fiyati, satis_fiyati, kritik_stok) VALUES (?,?,?,?,?)', $book);
+        q('INSERT INTO uy_books (kod, ad, alis_fiyati, satis_fiyati, kritik_stok) VALUES (?,?,?,?,?)', $book);
         $bookIds[] = (int) $pdo->lastInsertId();
     }
     $customerIds = [];
     foreach ([['Okul', 'Özel Başarı Okulu', 'Ankara', 'Çankaya'], ['Okul', 'Atatürk İlkokulu', 'Ankara', 'Keçiören'], ['Kırtasiye', 'Güneş Kırtasiye', 'İzmir', 'Karşıyaka']] as $customer) {
-        q('INSERT INTO customers (tip, ad, il, ilce) VALUES (?,?,?,?)', $customer);
+        q('INSERT INTO uy_customers (tip, ad, il, ilce) VALUES (?,?,?,?)', $customer);
         $customerIds[] = (int) $pdo->lastInsertId();
     }
     foreach ($bookIds as $i => $bookId) {
         $purchasePrice = [90, 95, 100][$i];
         $salePrice = [150, 170, 180][$i];
-        q('INSERT INTO stock_in (book_id, tarih, adet, teslim_alan, aciklama) VALUES (?,?,?,?,?)', [$bookId, $ago(90), 1000, $people[$i], 'Demo alış']);
+        q('INSERT INTO uy_stock_in (book_id, tarih, adet, teslim_alan, aciklama) VALUES (?,?,?,?,?)', [$bookId, $ago(90), 1000, $people[$i], 'Demo alış']);
         $stockId = (int) $pdo->lastInsertId();
-        q('INSERT INTO supplier_purchases (stock_in_id, total_cents, due_date) VALUES (?,?,?)', [$stockId, $purchasePrice * 1000 * 100, $ago(30)]);
-        q('INSERT INTO supplier_payments (stock_in_id, tarih, amount_cents, yontem, aciklama) VALUES (?,?,?,?,?)', [$stockId, $ago(40), 1000000, 'Havale/EFT', 'Demo ödeme']);
-        q('INSERT INTO supplier_returns (book_id, tarih, tedarikci, adet, birim_fiyat, toplam, aciklama) VALUES (?,?,?,?,?,?,?)', [$bookId, $ago(35), '', 2, $purchasePrice, 2 * $purchasePrice, 'Demo iade']);
-        q('INSERT INTO supplier_return_links (return_id, stock_in_id) VALUES (?,?)', [(int) $pdo->lastInsertId(), $stockId]);
+        q('INSERT INTO uy_supplier_purchases (stock_in_id, total_cents, due_date) VALUES (?,?,?)', [$stockId, $purchasePrice * 1000 * 100, $ago(30)]);
+        q('INSERT INTO uy_supplier_payments (stock_in_id, tarih, amount_cents, yontem, aciklama) VALUES (?,?,?,?,?)', [$stockId, $ago(40), 1000000, 'Havale/EFT', 'Demo ödeme']);
+        q('INSERT INTO uy_supplier_returns (book_id, tarih, tedarikci, adet, birim_fiyat, toplam, aciklama) VALUES (?,?,?,?,?,?,?)', [$bookId, $ago(35), '', 2, $purchasePrice, 2 * $purchasePrice, 'Demo iade']);
+        q('INSERT INTO uy_supplier_return_links (return_id, stock_in_id) VALUES (?,?)', [(int) $pdo->lastInsertId(), $stockId]);
         insert_stock_out($bookId, $customerIds[$i], $ago(60), 10, $people[$i], 'Eski demo çıkış');
         $outId = (int) $pdo->lastInsertId();
-        q('INSERT INTO stock_out_returns (stock_out_id, tarih, adet, aciklama) VALUES (?,?,?,?)', [$outId, $ago(50), 1, 'Demo iade']);
+        q('INSERT INTO uy_stock_out_returns (stock_out_id, tarih, adet, aciklama) VALUES (?,?,?,?)', [$outId, $ago(50), 1, 'Demo iade']);
         q('INSERT INTO sales (customer_id, tarih, vade_tarihi, toplam) VALUES (?,?,?,?)', [$customerIds[$i], $ago(45), $ago(15), 50 * $salePrice]);
         $saleId = (int) $pdo->lastInsertId();
         q('INSERT INTO sale_items (sale_id, book_id, adet, birim_fiyat, maliyet_birim, toplam) VALUES (?,?,?,?,?,?)', [$saleId, $bookId, 50, $salePrice, $purchasePrice, 50 * $salePrice]);
