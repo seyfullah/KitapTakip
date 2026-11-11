@@ -64,6 +64,41 @@ Mevcut stok hareketlerindeki kişi adları geçişte kişi listesine aktarılır
 
 Bu modda gerçek e-posta/SMS gönderimi özellikle devre dışıdır; `cron_notify.php` gönderim yapmadan açıklayıcı hata verir. Google Sheets aktarımı da servis hesabı ayarlanmadığı sürece kapalıdır.
 
+## Prodüksiyonda Kurulum (Paylaşımlı Hosting)
+
+Paylaşımlı hosting ortamında SSH/terminal erişimi olmadığında web tabanlı kurulum kullanın:
+
+1. **GitHub Actions ile Deploy Edin**
+   - Repository Settings > Secrets and variables > Actions'ta ayarlayın:
+     - `FTP_SERVER`: FTP sunucu adresi
+     - `FTP_USERNAME`: FTP kullanıcı adı
+     - `FTP_PASSWORD`: FTP şifresi
+     - `FTP_SERVER_DIR`: Hedef klasör (örn: `/public_html/uy`)
+   - Main branch'a push yapın → otomatik deployment başlar
+
+2. **Web Tabanlı Kurulum Çalıştırın**
+   - Tarayıcıda `https://siteniz.com/uy/setup.php` açın
+   - Setup sayfası otomatik olarak:
+     - ✅ Veri klasörünü oluşturur
+     - ✅ SQLite dosyasını hazırlar
+     - ✅ Veritabanı şemasını oluşturur
+     - ✅ Admin kullanıcısını tanımlar
+
+3. **setup.php Dosyasını Silin**
+   - FTP yönetim panelinde veya File Manager'da `setup.php` silin
+   - Güvenlik açısından önemlidir
+
+4. **Mevcut SQLite Dosyasını Kullanmak İçin**
+   - `kitaptakip-data/kitaptakip.sqlite` dosyasını FTP yoluyla yükleyin
+   - Setup sayfası otomatik olarak mevcut dosyayı algılar
+   - Veya FileZilla gibi FTP istemcisi kullanarak yükleyin
+
+### Sorun Giderme
+
+- **"no such table" hatası**: `setup.php`'yi çalıştırın
+- **"Permission denied"**: Dosya izinlerini kontrol edin (644 dosya, 755 klasör)
+- **Veriler görünmüyor**: SQLite dosyasının doğru yola yüklüyüm kontrol edin
+
 ## Gereksinimler
 
 - PHP 8.1 veya üzeri; MySQL modu için `pdo_mysql`, yerel dosya modu için `pdo_sqlite` ve SQLite 3.35 veya üzeri; dışa aktarım ve entegrasyonlara göre `mbstring`, `zip`, `curl` ve OpenSSL eklentileri

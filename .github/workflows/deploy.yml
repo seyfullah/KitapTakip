@@ -42,6 +42,7 @@ jobs:
             **/node_modules/**
             **/.DS_Store
             **/Thumbs.db
+            **/setup-log
 
       - name: Deployment sonrası bilgi
         if: success()
