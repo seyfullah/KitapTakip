@@ -8,7 +8,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.1.7
+      - name: Repository'i klonla
+        uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: Deployment öncesi kontrol
+        run: |
+          echo "📋 Deployment Bilgileri:"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo ""
+          echo "📁 Yüklenecek dosyalar:"
+          find . -type f ! -path './.git/*' ! -path './.github/*' ! -path './.vscode/*' ! -path '**/node_modules/*' | head -20
+          echo "... (daha fazla)"
 
       - name: FTPS ile yükle
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
@@ -20,16 +34,30 @@ jobs:
           port: 21
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           local-dir: ./
+          state-name: .ftp-deploy-sync-state.json
           exclude: |
             **/.git*
             **/.github/**
             **/.vscode/**
-            **/tests/**
-            **/sql/**
-            **/install.php
-            **/config.php
-            **/cron_sync.php
-            **/cron_notify.php
-            **/README.md
-            **/LICENSE
-            **/.gitignore
+            **/node_modules/**
+            **/.DS_Store
+            **/Thumbs.db
+
+      - name: Deployment sonrası bilgi
+        if: success()
+        run: echo "✅ Dosyalar başarıyla yüklendi"
+
+      - name: Deployment hatası
+        if: failure()
+        run: |
+          echo "❌ Deployment başarısız"
+          echo ""
+          echo "Kontrol Listesi:"
+          echo "1. FTP_SERVER secret ayarlanmış mı?"
+          echo "2. FTP_USERNAME secret ayarlanmış mı?"
+          echo "3. FTP_PASSWORD secret ayarlanmış mı?"
+          echo "4. FTP_SERVER_DIR secret ayarlanmış mı?"
+          echo "5. FTP sunucusunda .ftp-deploy-sync-state.json dosyası var mı?"
+          echo ""
+          echo "Daha fazla bilgi: GitHub Actions > Actions > Son çalışmayı açıp logs'a bakın"
+          exit 1
