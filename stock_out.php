@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $date = valid_date(post('tarih'));
         $recipient = post('teslim_edilen');
         if ($recipient === '' || mb_strlen($recipient) > 200) throw new DomainException('Teslim edilen kişi zorunludur (en fazla 200 karakter).');
-        $person = row('SELECT ad FROM people WHERE id = ?', [(int) post('person_id')]);
+        $person = row('SELECT ad FROM uy_people WHERE id = ?', [(int) post('person_id')]);
         if (!$person) throw new DomainException('Listeden götüren kişiyi seçin.');
         $units = deliver_sale($saleId, $date, $person['ad'], $recipient);
         flash("Teslimat kaydedildi ($units adet). Stok satış sırasında düşülmüştür.");
@@ -16,17 +16,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     redirect('stock_out.php' . ($saleId > 0 ? '?sale_id=' . $saleId : ''));
 }
-$itemQuery = ' FROM sale_items si
-    LEFT JOIN (SELECT sale_item_id, SUM(adet) adet FROM sale_deliveries GROUP BY sale_item_id) d ON d.sale_item_id = si.id
-    LEFT JOIN legacy_sale_returns l ON l.sale_item_id = si.id';
+$itemQuery = ' FROM uy_sale_items si
+    LEFT JOIN (SELECT sale_item_id, SUM(adet) adet FROM uy_sale_deliveries GROUP BY sale_item_id) d ON d.sale_item_id = si.id
+    LEFT JOIN uy_legacy_sale_returns l ON l.sale_item_id = si.id';
 
 if (!$saleId) {
     layout_head('Teslimat Bekleyen Satışlar', 'stock_out');
     $sales = rows('SELECT s.id, s.tarih, s.vade_tarihi, c.ad musteri, c.tip, s.toplam,
         SUM(si.adet - COALESCE(d.adet,0) - COALESCE(l.adet,0)) kalan
-        FROM sales s JOIN customers c ON c.id = s.customer_id JOIN sale_items si ON si.sale_id = s.id
-        LEFT JOIN (SELECT sale_item_id, SUM(adet) adet FROM sale_deliveries GROUP BY sale_item_id) d ON d.sale_item_id = si.id
-        LEFT JOIN legacy_sale_returns l ON l.sale_item_id = si.id
+        FROM uy_sales s JOIN uy_customers c ON c.id = s.customer_id JOIN uy_sale_items si ON si.sale_id = s.id
+        LEFT JOIN (SELECT sale_item_id, SUM(adet) adet FROM uy_sale_deliveries GROUP BY sale_item_id) d ON d.sale_item_id = si.id
+        LEFT JOIN uy_legacy_sale_returns l ON l.sale_item_id = si.id
         GROUP BY s.id, s.tarih, s.vade_tarihi, c.ad, c.tip, s.toplam
         HAVING SUM(si.adet - COALESCE(d.adet,0) - COALESCE(l.adet,0)) > 0 ORDER BY s.tarih DESC, s.id DESC');
     $data = [];
@@ -42,7 +42,7 @@ if (!$saleId) {
     return;
 }
 
-$sale = row('SELECT s.*, c.ad musteri, c.tip FROM sales s JOIN customers c ON c.id = s.customer_id WHERE s.id = ?', [$saleId]);
+$sale = row('SELECT s.*, c.ad musteri, c.tip FROM uy_sales s JOIN uy_customers c ON c.id = s.customer_id WHERE s.id = ?', [$saleId]);
 if (!$sale) {
     http_response_code(404);
     layout_head('Satış Bulunamadı', 'stock_out');
@@ -52,7 +52,7 @@ if (!$sale) {
 }
 $items = rows('SELECT si.id, si.adet, si.birim_fiyat, si.toplam, b.kod, b.ad kitap,
         COALESCE(d.adet,0) delivered, COALESCE(l.adet,0) legacy' . $itemQuery .
-    ' JOIN books b ON b.id = si.book_id WHERE si.sale_id = ? ORDER BY si.id', [$saleId]);
+    ' JOIN uy_books b ON b.id = si.book_id WHERE si.sale_id = ? ORDER BY si.id', [$saleId]);
 $currentPersonId = current_person_id();
 layout_head('Satış #' . $saleId . ' · Teslimat', 'stock_out');
     echo '<p><a href="stock_out.php">← Teslimat bekleyen satışlara dön</a></p>';

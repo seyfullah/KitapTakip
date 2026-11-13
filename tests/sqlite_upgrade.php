@@ -99,12 +99,12 @@ try {
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_GET = [];
     ob_start();
-    require __DIR__ . '/../pages/stock_out.php';
+    require __DIR__ . '/../stock_out.php';
     $list = ob_get_clean();
     $check(str_contains($list, 'sale_id=2') && !str_contains($list, 'sale_id=1'), 'Bekleyen satış listesi yanlış.');
     $_GET = ['sale_id' => '2'];
     ob_start();
-    require __DIR__ . '/../pages/stock_out.php';
+    require __DIR__ . '/../stock_out.php';
     $detail = ob_get_clean();
     $check(str_contains($detail, 'Sipariş notu') && str_contains($detail, 'Sipariş İçeriği'), 'Sipariş ayrıntıları gösterilmedi.');
     $check(str_contains($detail, 'value="' . $personId . '" selected'), 'Giriş yapan kişinin seçimi gösterilmedi.');

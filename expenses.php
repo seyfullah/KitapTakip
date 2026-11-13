@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     after_write();
     redirect('expenses.php');
 }
-layout_head('Gider Kaydı', 'uy_expenses'); ?>
+layout_head('Gider Kaydı', 'expenses'); ?>
 <form method="post" class="f no-print">
   <input type="hidden" name="_csrf" value="<?= csrf() ?>">
   <label>Tarih<input type="date" name="tarih" value="<?= date('Y-m-d') ?>" required></label>

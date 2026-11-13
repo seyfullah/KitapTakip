@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('loans.php');
 }
 
-layout_head('Alınan Borçlar', 'uy_loans');
+layout_head('Alınan Borçlar', 'loans');
 $openLoans = rows('SELECT l.id, l.alacakli, l.tutar, l.tutar - COALESCE(p.odenen,0) kalan FROM uy_loans l LEFT JOIN (SELECT loan_id, SUM(tutar) odenen FROM uy_loan_payments GROUP BY loan_id) p ON p.loan_id = l.id WHERE l.tutar > COALESCE(p.odenen,0) ORDER BY l.tarih, l.id');
 ?>
 <form method="post" class="f no-print">

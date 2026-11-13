@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 $e = get('edit') ? row('SELECT * FROM uy_customers WHERE id = ?', [(int) get('edit')]) : null;
 $e ??= ['id' => '', 'tip' => 'Okul', 'ad' => '', 'il' => '', 'ilce' => '', 'yetkili' => '', 'telefon' => '', 'eposta' => '', 'adres' => ''];
-layout_head('Müşteriler', 'uy_customers'); ?>
+layout_head('Müşteriler', 'customers'); ?>
 <form method="post" class="f no-print">
   <input type="hidden" name="_csrf" value="<?= csrf() ?>"><input type="hidden" name="id" value="<?= h($e['id']) ?>">
   <label>Tip<?= select('tip', ['Okul' => 'Okul', 'Kırtasiye' => 'Kırtasiye'], $e['tip']) ?></label>
@@ -37,6 +37,6 @@ echo '<form class="f no-print"><input type="hidden" name="p" value="uy_customers
 $list = rows('SELECT * FROM uy_customers WHERE (tip = :t OR :t2 = "") AND (ad LIKE :q OR il LIKE :q2 OR ilce LIKE :q3) ORDER BY ad', ['t' => $tip, 't2' => $tip, 'q' => "%$fq%", 'q2' => "%$fq%", 'q3' => "%$fq%"]);
 $data = [];
 foreach ($list as $c) $data[] = [$c['tip'], $c['ad'], $c['il'], $c['ilce'], $c['adres'], $c['yetkili'], $c['telefon'], $c['eposta'],
-    '<a href="uy_customers.php&edit=' . $c['id'] . '">Düzenle</a> · <a href="cari.php&customer_id=' . $c['id'] . '">Ekstre</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . $c['id'] . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
+    '<a href="customers.php&edit=' . $c['id'] . '">Düzenle</a> · <a href="cari.php&customer_id=' . $c['id'] . '">Ekstre</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . $c['id'] . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
 table(['Tip', 'Ad', 'İl', 'İlçe', 'Adres', 'Yetkili', 'Telefon', 'E-posta', ''], $data, ['raw' => [8 => true]]);
 layout_foot();

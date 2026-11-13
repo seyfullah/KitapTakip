@@ -56,7 +56,7 @@ layout_head('Tedarikçiye İade', 'returns_supplier');
   <label>Açıklama<input name="aciklama"></label>
   <button>İadeyi Kaydet</button>
 </form>
-<p class="muted">İade, girişin alış tutarıyla orantılı hesaplanır ve ilgili borçtan düşülür. Eski girişler için önce <a href="uy_supplier_payments.php">alış bilgilerini</a> kaydedin. Önceki iadeler girişlerle otomatik eşleştirilmez.</p>
+<p class="muted">İade, girişin alış tutarıyla orantılı hesaplanır ve ilgili borçtan düşülür. Eski girişler için önce <a href="supplier_payments.php">alış bilgilerini</a> kaydedin. Önceki iadeler girişlerle otomatik eşleştirilmez.</p>
 <?php
 $data = [];
 foreach (rows('SELECT r.*, l.stock_in_id, b.kod, b.ad kitap FROM uy_supplier_returns r LEFT JOIN uy_supplier_return_links l ON l.return_id = r.id JOIN uy_books b ON b.id = r.book_id ORDER BY r.tarih DESC, r.id DESC LIMIT 200') as $r)

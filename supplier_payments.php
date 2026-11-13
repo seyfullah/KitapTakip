@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $purchases = supplier_purchase_rows();
-layout_head('Tedarikçi Ödemeleri', 'uy_supplier_payments');
+layout_head('Tedarikçi Ödemeleri', 'supplier_payments');
 ?>
 <div class="form-grid">
 <form method="post" class="card">

@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     after_write(); redirect('payments.php');
 }
-layout_head('Tahsilat Girişi', 'uy_payments'); ?>
+layout_head('Tahsilat Girişi', 'payments'); ?>
 <form method="post" class="f no-print">
   <input type="hidden" name="_csrf" value="<?= csrf() ?>">
   <label>Müşteri<?= select('customer_id', customer_opts(true), get('customer_id'), 'required') ?></label>

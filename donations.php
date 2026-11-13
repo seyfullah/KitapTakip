@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     after_write();
     redirect('donations.php');
 }
-layout_head('Bağış Kaydı', 'uy_donations'); ?>
+layout_head('Bağış Kaydı', 'donations'); ?>
 <form method="post" class="f no-print">
   <input type="hidden" name="_csrf" value="<?= csrf() ?>">
   <label>Tarih<input type="date" name="tarih" value="<?= date('Y-m-d') ?>" required></label>

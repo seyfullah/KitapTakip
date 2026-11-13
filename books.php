@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 $e = get('edit') ? row('SELECT * FROM uy_books WHERE id = ?', [(int) get('edit')]) : null;
 $e ??= ['id' => '', 'kod' => '', 'ad' => '', 'alis_fiyati' => '', 'satis_fiyati' => '', 'kritik_stok' => 0];
-layout_head('Kitap Kartları', 'uy_books'); ?>
+layout_head('Kitap Kartları', 'books'); ?>
 <form method="post" class="f no-print">
   <input type="hidden" name="_csrf" value="<?= csrf() ?>"><input type="hidden" name="id" value="<?= h($e['id']) ?>">
   <label>Kitap Kodu<input name="kod" required value="<?= h($e['kod']) ?>"></label>
@@ -33,6 +33,6 @@ $list = rows('SELECT * FROM uy_books WHERE kod LIKE :q OR ad LIKE :q2 ORDER BY a
 echo '<form class="f no-print"><input type="hidden" name="p" value="uy_books"><label>Ara<input name="q" value="' . h($fq) . '"></label><button>Filtrele</button></form>';
 $data = [];
 foreach ($list as $b) $data[] = [$b['kod'], $b['ad'], $b['alis_fiyati'], $b['satis_fiyati'], $b['kritik_stok'],
-    '<a href="uy_books.php&edit=' . $b['id'] . '">Düzenle</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . $b['id'] . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
+    '<a href="books.php&edit=' . $b['id'] . '">Düzenle</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . $b['id'] . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
 table(['Kod', 'Ad', 'Alış', 'Satış', 'Kritik', ''], $data, ['money' => [2, 3], 'raw' => [5 => true]]);
 layout_foot();
