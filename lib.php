@@ -158,21 +158,23 @@ function deliver_sale(int $saleId, string $date, string $carrier, string $recipi
     else $pdo->beginTransaction();
     try {
         $lock = cfg('app_storage') === 'sqlite' ? '' : ' FOR UPDATE';
-        $sale = row('SELECT id, tarih FROM sales WHERE id = ?' . $lock, [$saleId]);
+        $sale = row('SELECT id, tarih FROM uy_sales WHERE id = ?' . $lock, [$saleId]);
         if (!$sale) throw new DomainException('Satış bulunamadı.');
         if ($date < $sale['tarih']) throw new DomainException('Teslim tarihi satış tarihinden önce olamaz.');
-        $items = rows('SELECT id, adet FROM sale_items WHERE sale_id = ? ORDER BY id' . $lock, [$saleId]);
+        $items = rows('SELECT id, adet FROM uy_sale_items WHERE sale_id = ? ORDER BY id' . $lock, [$saleId]);
         $total = 0;
         foreach ($items as $item) {
-            $legacy = (int) val('SELECT COALESCE(SUM(adet),0) FROM legacy_sale_returns WHERE sale_item_id = ?', [$item['id']]);
-            $delivered = (int) val('SELECT COALESCE(SUM(adet),0) FROM sale_deliveries WHERE sale_item_id = ?', [$item['id']]);
+            $legacy = (int) val('SELECT COALESCE(SUM(adet),0) FROM uy_legacy_sale_returns WHERE sale_item_id = ?', [$item['id']]);
+            $delivered = (int) val('SELECT COALESCE(SUM(adet),0) FROM uy_sale_deliveries WHERE sale_item_id = ?', [$item['id']]);
             $remaining = (int) $item['adet'] - $legacy - $delivered;
             if ($remaining < 0) throw new DomainException('Satış kalemindeki teslimat bilgileri tutarsız.');
             if ($remaining === 0) continue;
-            q('INSERT INTO sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)',
+            q('INSERT INTO uy_sale_deliveries (sale_item_id, tarih, adet, goturen_kisi, teslim_edilen) VALUES (?,?,?,?,?)',
                 [$item['id'], $date, $remaining, $carrier, $recipient]);
             $total += $remaining;
         }
+        q('UPDATE uy_sales SET durum = ? WHERE id = ?',
+            ['Teslim Edildi', $saleId]);
         if ($total === 0) throw new DomainException('Bu satışın teslimat bekleyen kalemi yok.');
         if ($sqlite) $pdo->exec('COMMIT');
         else $pdo->commit();
@@ -805,24 +807,30 @@ function send_weekly_reminders(): array {
 
 function layout_head(string $title, string $page): void {
     $groups = [
-        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler', 'customers' => 'Müşteriler', 'account' => 'Hesabım'],
-        'Stok' => ['stock_in' => 'Stok Girişi', 'stock_out' => 'Teslimat Bekleyen Satışlar',
-            'stock_current' => 'Güncel Stok', 'stock_in_history' => 'Giriş Hareketleri', 'stock_out_history' => 'Çıkış Hareketleri'],
-        'Satış ve İade' => ['sales' => 'Satış Kayıt', 'sales_list' => 'Satış Listesi', 'returns_customer' => 'Müşteri İadesi',
-            'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi'],
+        'Satış' => ['sales' => 'Satış Kayıt',
+                    'sales_list' => 'Satış Listesi',
+                    'stock_out' => 'Teslimat Edilecekler'],
+        'Stok' => ['stock_in' => 'Stok Girişi',
+            'stock_current' => 'Güncel Stok',
+            'stock_in_history' => 'Giriş Hareketleri',
+            'stock_out_history' => 'Çıkış Hareketleri'],
+        'İade' => ['returns_customer' => 'Müşteri İadesi', 'returns_stock_out' => 'Stok Çıkış İadesi', 'returns_supplier' => 'Tedarikçi İadesi'],
         'Muhasebe' => ['payments' => 'Tahsilat', 'cari' => 'Cari / Ekstre', 'overdue' => 'Vadeli Alacak'],
         'Finans' => ['expenses' => 'Giderler', 'donations' => 'Bağışlar', 'loans' => 'Alınan Borçlar', 'supplier_payments' => 'Tedarikçi Ödemeleri', 'finance' => 'Kâr / Zarar'],
+        'Tanımlar' => ['books' => 'Kitaplar', 'people' => 'Kişiler', 'customers' => 'Müşteriler', 'account' => 'Hesabım'],
         'Diğer' => ['notifications' => 'Bildirimler', 'reports' => 'Raporlar', 'export' => 'Excel / Sheets'],
     ];
+    // $currentUser = row('SELECT ad FROM uy_people WHERE id = (SELECT person_id FROM uy_users WHERE id = ?)', [(int) ($_SESSION['uid'] ?? 0)]);
+    // $userDisplay = $currentUser ? h($currentUser['ad']) : '';
     $currentUser = row('SELECT kullanici FROM uy_users WHERE id = ?', [(int) ($_SESSION['uid'] ?? 0)]);
     $userDisplay = $currentUser ? h($currentUser['kullanici']) : '';
-    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><b class="brand">📚 Kitap Cari</b><div class="nav-groups">';
-    echo '<a href="dashboard.php"' . ($page === 'dashboard' ? ' class="on" aria-current="page"' : '') . '>Panel</a>';
+    echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b33"><title>' . h($title) . ' - Kitap Cari</title><link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script></head><body><nav class="no-print" aria-label="Ana menü"><a href="index.php" class="brand">📚 Kitap Cari</a><div class="nav-groups">';
     foreach ($groups as $label => $items) {
         echo '<details class="nav-menu"><summary' . (isset($items[$page]) ? ' class="on"' : '') . '>' . h($label) . '</summary><div class="nav-links">';
         foreach ($items as $k => $v) echo '<a href="' . $k . '.php"' . ($k === $page ? ' class="on" aria-current="page"' : '') . '>' . h($v) . '</a>';
         echo '</div></details>';
-    }
+        }
+    echo '<a href="dashboard.php"' . ($page === 'dashboard' ? ' class="on" aria-current="page"' : '') . '>Panel</a>';
     echo '</div><div class="nav-user"><span class="username">' . $userDisplay . '</span><a href="logout.php" class="logout">Çıkış</a></div></nav><main>';
     if ($m = flash()) echo '<div class="flash">' . h($m) . '</div>';
     echo '<h1>' . h($title) . '</h1>';

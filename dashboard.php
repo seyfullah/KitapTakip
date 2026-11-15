@@ -44,7 +44,7 @@ echo '</div>';
   <div><h2>En Çok Satış Yapılan Okullar</h2><?php table(['Okul', 'Tutar'], array_map('array_values', $schools), ['money' => [1]]); ?></div>
   <div><h2>En Çok Satış Yapılan Kırtasiyeler</h2><?php table(['Kırtasiye', 'Tutar'], array_map('array_values', $shops), ['money' => [1]]); ?></div>
   <div><h2>En Çok Satış Yapılan Müşteriler</h2><?php table(['Müşteri', 'Tip', 'Satılan Adet', 'Satış', 'Tahsilat', 'Kalan'], array_map(fn($r) => [$r['ad'], $r['tip'], $r['adet'], $r['satis'], $r['tahsilat'], $r['kalan']], $topSalesCustomers), ['int' => [2], 'money' => [3, 4, 5], 'totals' => [2, 3, 4, 5]]); ?></div>
-  <div><h2>En Yüksek Alacağı Olan Müşteriler</h2><?php table(['Müşteri', 'Tip', 'Kalan Alacak'], array_map(fn($r) => [$r['ad'], $r['tip'], $r['kalan']], $recv), ['money' => [2], 'totals' => [2]]); ?></div>
+  <div><h2>En Yüksek Alacak Olan Müşteriler</h2><?php table(['Müşteri', 'Tip', 'Kalan Alacak'], array_map(fn($r) => [$r['ad'], $r['tip'], $r['kalan']], $recv), ['money' => [2], 'totals' => [2]]); ?></div>
   <?php if ($crit): ?><div><h2>Kritik Stok Uyarıları</h2><?php table(['Kitap', 'Stok', 'Kritik'], array_map(fn($s) => [$s['ad'], $s['stok'], $s['kritik_stok']], $crit), ['int' => [1, 2]]); ?></div><?php endif; ?>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>

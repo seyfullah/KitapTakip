@@ -37,6 +37,6 @@ echo '<form class="f no-print"><input type="hidden" name="p" value="uy_customers
 $list = rows('SELECT * FROM uy_customers WHERE (tip = :t OR :t2 = "") AND (ad LIKE :q OR il LIKE :q2 OR ilce LIKE :q3) ORDER BY ad', ['t' => $tip, 't2' => $tip, 'q' => "%$fq%", 'q2' => "%$fq%", 'q3' => "%$fq%"]);
 $data = [];
 foreach ($list as $c) $data[] = [$c['tip'], $c['ad'], $c['il'], $c['ilce'], $c['adres'], $c['yetkili'], $c['telefon'], $c['eposta'],
-    '<a href="customers.php&edit=' . $c['id'] . '">Düzenle</a> · <a href="cari.php&customer_id=' . $c['id'] . '">Ekstre</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . $c['id'] . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
+    '<a href="customers.php?edit=' . $c['id'] . '">Düzenle</a> · <a href="cari.php?customer_id=' . $c['id'] . '">Ekstre</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . $c['id'] . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
 table(['Tip', 'Ad', 'İl', 'İlçe', 'Adres', 'Yetkili', 'Telefon', 'E-posta', ''], $data, ['raw' => [8 => true]]);
 layout_foot();

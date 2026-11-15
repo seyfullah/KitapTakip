@@ -39,7 +39,7 @@ layout_head('Kişiler', 'people');
 <?php
 $data = [];
 foreach (rows('SELECT id, ad FROM uy_people ORDER BY ad') as $person) {
-    $data[] = [$person['ad'], '<a href="people.php&edit=' . h($person['id']) . '">Düzenle</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Kişi listeden silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . h($person['id']) . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
+    $data[] = [$person['ad'], '<a href="people.php?edit=' . h($person['id']) . '">Düzenle</a> <form method="post" style="display:inline" onsubmit="return confirm(\'Kişi listeden silinsin mi?\')"><input type="hidden" name="_csrf" value="' . csrf() . '"><input type="hidden" name="id" value="' . h($person['id']) . '"><input type="hidden" name="act" value="delete"><button class="danger">Sil</button></form>'];
 }
 table(['Ad Soyad', ''], $data, ['raw' => [1 => true]]);
 layout_foot();

@@ -78,7 +78,7 @@ if (!$pending) {
     return;
 }
 if ($currentPersonId === null) {
-    echo '<p>Teslimat kaydı için önce <a href="account.php&amp;return=stock_out&amp;sale_id=' . h($saleId) . '">hesabınızı kişi kaydınızla eşleştirin</a>.</p>';
+    echo '<p>Teslimat kaydı için önce <a href="account.php?amp;return=stock_out&amp;sale_id=' . h($saleId) . '">hesabınızı kişi kaydınızla eşleştirin</a>.</p>';
     layout_foot();
     return;
 }
@@ -88,7 +88,7 @@ if ($currentPersonId === null) {
   <input type="hidden" name="sale_id" value="<?= h($saleId) ?>">
   <h2>Teslimat Kaydı</h2>
   <label>Teslim Tarihi<input type="date" name="tarih" value="<?= date('Y-m-d') ?>" required></label>
-  <label>Götüren Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
+  <label>Götüren Kişi<select name="person_id" class="person-select" required><option value="">— Seçiniz —</option><?php foreach (rows('SELECT id, ad FROM uy_people ORDER BY ad') as $person) echo '<option value="' . h($person['id']) . '"' . ((int) $person['id'] === $currentPersonId ? ' selected' : '') . '>' . h($person['ad']) . '</option>'; ?></select></label>
   <a href="people.php">Kişileri yönet</a>
   <label>Teslim Edilen Kişi<input name="teslim_edilen" maxlength="200" required></label>
   <button>Teslimatı Kaydet</button>

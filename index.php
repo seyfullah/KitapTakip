@@ -13,6 +13,6 @@ if (!empty($_GET['p'])) {
     exit;
 }
 
-// Default: dashboard'a yönlendir
-header('Location: dashboard.php');
+// Default: sales'a yönlendir
+header('Location: sales.php');
 exit;

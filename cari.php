@@ -5,7 +5,7 @@ if (!$cid) {
     layout_head('Cari Hesap Özeti', 'cari');
     echo '<form class="f no-print"><input type="hidden" name="p" value="cari"><label>Başlangıç<input type="date" name="from" value="' . h($from) . '"></label><label>Bitiş<input type="date" name="to" value="' . h($to) . '"></label><button>Filtrele</button></form>';
     $data = [];
-    foreach (customer_balances($from, $to) as $b) $data[] = ['<a href="cari.php&customer_id=' . $b['id'] . '">' . h($b['ad']) . '</a>', $b['tip'], $b['il'] . ' / ' . $b['ilce'], $b['satis'], $b['tahsilat'], $b['kalan']];
+    foreach (customer_balances($from, $to) as $b) $data[] = ['<a href="cari.php?customer_id=' . $b['id'] . '">' . h($b['ad']) . '</a>', $b['tip'], $b['il'] . ' / ' . $b['ilce'], $b['satis'], $b['tahsilat'], $b['kalan']];
     table(['Müşteri', 'Tip', 'İl / İlçe', 'Toplam Satış', 'Toplam Tahsilat', 'Kalan Alacak'], $data, ['money' => [3, 4, 5], 'totals' => [3, 4, 5], 'raw' => [0 => true]]);
     layout_foot(); exit;
 }
